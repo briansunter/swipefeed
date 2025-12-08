@@ -4,21 +4,7 @@ import { useVirtualizer } from "../hooks/useVirtualizer";
 import { Virtualizer } from "@tanstack/virtual-core";
 
 describe("useVirtualizer", () => {
-  it("computes virtual items for native mode (simple pass-through)", () => {
-    const items = Array.from({ length: 10 }, (_, i) => ({ id: i }));
-    const { result } = renderHook(() =>
-      useVirtualizer({
-        items,
-        virtual: { estimatedSize: 100 },
-        resolvedMode: "native",
-        getScrollElement: () => document.createElement('div'),
-      })
-    );
 
-    const offsets = result.current.virtualItems.map(v => v.offset);
-    expect(offsets).toEqual([0, 100, 200, 300, 400, 500, 600, 700, 800, 900]);
-    expect(result.current.totalSize).toBe(1000);
-  });
 
   it("computes virtual items for virtualized mode", () => {
     const items = Array.from({ length: 100 }, (_, i) => ({ id: i }));
@@ -37,7 +23,7 @@ describe("useVirtualizer", () => {
       useVirtualizer({
         items,
         virtual: { estimatedSize: 100, overscan: 0 },
-        resolvedMode: "virtualized",
+
         getScrollElement: () => container,
       })
     );

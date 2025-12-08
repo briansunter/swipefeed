@@ -22,7 +22,7 @@ describe("SwipeDeck (browser-like)", () => {
     render(
       <SwipeDeck
         items={items}
-        mode="virtualized"
+
         visibility={{ debounce: 0 }}
         virtual={{ estimatedSize: 400 }}
         wheel={{ discretePaging: true, threshold: 1, debounce: 0 }}
@@ -66,7 +66,7 @@ describe("SwipeDeck (browser-like)", () => {
         ]}
         orientation="horizontal"
         direction="rtl"
-        mode="native"
+
         visibility={{ debounce: 0 }}
         wheel={{ threshold: 1, debounce: 0 }}
         onIndexChange={(i) => onIndexChange(i)}

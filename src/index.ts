@@ -12,7 +12,7 @@ export type {
   SwipeDeckRenderContext,
   IndexChangeSource,
   Orientation,
-  Mode,
+
   Direction,
   ScrollBehavior,
 } from "./types";

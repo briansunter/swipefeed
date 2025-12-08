@@ -31,7 +31,7 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
         isAnimating: deck.isAnimating,
         canPrev: deck.canPrev,
         canNext: deck.canNext,
-        resolvedMode: deck.resolvedMode,
+
       }),
     }),
     [deck],

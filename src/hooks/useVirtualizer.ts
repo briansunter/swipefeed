@@ -4,7 +4,6 @@ import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types"
 type UseVirtualizerParams<T> = {
   items: readonly T[];
   virtual: VirtualConfig | undefined;
-  resolvedMode: "native" | "virtualized";
   getScrollElement: () => HTMLElement | null;
   orientation?: Orientation;
 };
@@ -21,12 +20,11 @@ type VirtualizerResult = {
  * Simplified adapter using @tanstack/react-virtual
  */
 export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerResult {
-  const { items, virtual, resolvedMode, getScrollElement, orientation = "vertical" } = params;
+  const { items, virtual, getScrollElement, orientation = "vertical" } = params;
   const count = items.length;
-  const enabled = resolvedMode === "virtualized";
 
   const rowVirtualizer = useTanStackVirtualizer({
-    count: enabled ? count : 0,
+    count,
     getScrollElement,
     estimateSize: (i) => {
       const est = virtual?.estimatedSize ?? 800;
@@ -39,24 +37,6 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     horizontal: orientation === "horizontal",
     getItemKey: virtual?.getItemKey ? (index) => virtual.getItemKey!(items[index], index) : undefined,
   });
-
-  if (resolvedMode === "native") {
-    const estimated = (virtual?.estimatedSize as number) || 800;
-    const size = typeof estimated === 'number' ? estimated : 800;
-    return {
-      virtualItems: items.map((_, i) => ({
-        index: i,
-        key: i,
-        offset: i * size,
-        size: size,
-        measureElement: undefined,
-      })),
-      totalSize: items.length * size,
-      getItemOffset: (i) => i * size,
-      getItemSize: (i) => size,
-      scrollToIndex: () => { },
-    };
-  }
 
   return {
     virtualItems: rowVirtualizer.getVirtualItems().map(item => ({

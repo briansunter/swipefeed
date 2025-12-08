@@ -1,7 +1,6 @@
 import type React from "react";
 import type { JSX } from "react";
 export type Orientation = "vertical" | "horizontal";
-export type Mode = "native" | "virtualized" | "auto";
 export type Direction = "ltr" | "rtl";
 export type ScrollBehavior = "smooth" | "instant" | "auto";
 
@@ -52,7 +51,6 @@ export interface VirtualConfig {
 export interface SwipeDeckOptions<T> {
   items: readonly T[];
   orientation?: Orientation;
-  mode?: Mode;
   direction?: Direction;
   defaultIndex?: number;
   index?: number;
@@ -76,7 +74,6 @@ export interface SwipeDeckState {
   isAnimating: boolean;
   canPrev: boolean;
   canNext: boolean;
-  resolvedMode: "native" | "virtualized";
 }
 
 export interface SwipeDeckActions {

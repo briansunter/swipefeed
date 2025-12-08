@@ -4,13 +4,10 @@ import { prefersReducedMotion } from "../utils/prefersReducedMotion";
 import { useGestures } from "./useGestures";
 import { useWheel } from "./useWheel";
 import { useKeyboard } from "./useKeyboard";
-
 import { useVirtualizer } from "./useVirtualizer";
-import { useScrollTo } from "./useScrollTo";
 import type {
   Direction,
   IndexChangeSource,
-  Mode,
   Orientation,
   ScrollBehavior,
   SwipeDeckAPI,
@@ -20,13 +17,12 @@ import type {
 
 const DEFAULTS = {
   orientation: "vertical" as Orientation,
-  mode: "auto" as Mode,
   direction: "ltr" as Direction,
   loop: false,
   defaultIndex: 0,
   gesture: {
-    threshold: 50,
-    flickVelocity: 0.5,
+    threshold: 10,
+    flickVelocity: 0.1,
     lockAxis: true,
     ignoreWhileAnimating: true,
   },
@@ -44,7 +40,7 @@ const DEFAULTS = {
     debounce: 100,
   },
   virtual: {
-    overscan: 2,
+    overscan: 5,
   },
   endReachedThreshold: 3,
   ariaLabel: "Swipe feed",
@@ -55,25 +51,16 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const items = options.items ?? [];
   const orientation = options.orientation ?? DEFAULTS.orientation;
   const direction = options.direction ?? DEFAULTS.direction;
-  const mode = options.mode ?? DEFAULTS.mode;
   const loop = options.loop ?? DEFAULTS.loop;
   const defaultIndex = options.defaultIndex ?? DEFAULTS.defaultIndex;
 
   const gestureCfg = { ...DEFAULTS.gesture, ...(options.gesture ?? {}) };
   const wheelCfg = { ...DEFAULTS.wheel, ...(options.wheel ?? {}) };
   const keyboardCfg = { ...DEFAULTS.keyboard, ...(options.keyboard ?? {}) };
-  const visibilityCfg = { ...DEFAULTS.visibility, ...(options.visibility ?? {}) };
   const virtualCfg = { ...DEFAULTS.virtual, ...(options.virtual ?? {}) };
   const endReachedThreshold = options.endReachedThreshold ?? DEFAULTS.endReachedThreshold;
   const ariaLabel = options.ariaLabel ?? DEFAULTS.ariaLabel;
   const keyboardNavigation = options.keyboardNavigation ?? true;
-
-  const resolvedMode: "native" | "virtualized" = useMemo(() => {
-    if (mode === "auto") {
-      return items.length < 50 ? "native" : "virtualized";
-    }
-    return mode === "native" ? "native" : "virtualized";
-  }, [items.length, mode]);
 
   const isControlled = typeof options.index === "number";
   const [internalIndex, setInternalIndex] = useState(() => clamp(defaultIndex, 0, Math.max(items.length - 1, 0)));
@@ -93,15 +80,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const virtualizer = useVirtualizer({
     items,
     virtual: virtualCfg,
-    resolvedMode,
     getScrollElement: () => viewportRef.current,
     orientation,
-  });
-
-  // We still use useScrollTo for native mode or fallback, but for virtualized, we use virtualizer.scrollToIndex
-  const { scrollToIndex: rawScrollTo } = useScrollTo({
-    getViewport: () => viewportRef.current,
-    setAnimating: setIsAnimating,
   });
 
   const applyIndexChange = useCallback(
@@ -116,7 +96,6 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   );
 
 
-
   const navigateTo = useCallback(
     (targetIndex: number, source: IndexChangeSource, behavior?: ScrollBehavior) => {
       if (items.length === 0) return;
@@ -129,28 +108,30 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       }
       sourceRef.current = source;
 
-      const scrollBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
+      const targetBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
 
-      if (resolvedMode === "virtualized") {
-        virtualizer.scrollToIndex(next, { behavior: scrollBehavior === 'instant' ? 'auto' : 'smooth', align: 'start' });
-        // We might need to manually trigger index change event if virtualizer doesn't invoke a callback that we can hook into.
-        // In virtualized mode with windowing, we rely on scroll position to determine active index usually.
-        // BUT if we are programmatically navigating, we want to update the index state.
-        if (scrollBehavior === 'instant' || !isControlled) {
-          applyIndexChange(next);
-        }
-      } else {
-        // Native mode fallback
-        // The original code used scrollToIndex(offset).
-        // virtualizer.getItemOffset returns offset.
-        const targetOffset = items.length > 0 ? (next * (viewportRef.current?.clientHeight || 800)) : 0; // Estimate for native
-        rawScrollTo(targetOffset, scrollBehavior);
-        if (!isControlled && scrollBehavior === 'instant') {
-          applyIndexChange(next);
-        }
+      // Optimization: trigger 'auto' scroll in JS, let CSS 'scroll-behavior: smooth' handle the animation
+      // This reduces JS main thread work and jitter.
+      // However, if we want 'instant', we rely on the fact that 'instant' usually overrides or we might need to handle it.
+      // For now, focusing on the "Native/Smooth" case.
+
+      // CRITICAL FIX: explicit style override to ensure smooth snap
+      // React state update for 'isDragging' is too slow (happens after this call).
+      // We must force the visual style to 'smooth' BEFORE calling scroll.
+      if (source === 'user:gesture' && targetBehavior === 'smooth' && viewportRef.current) {
+        viewportRef.current.style.scrollBehavior = 'smooth';
+      }
+
+      virtualizer.scrollToIndex(next, { behavior: 'auto', align: 'start' });
+
+      // We might need to manually trigger index change event if virtualizer doesn't invoke a callback that we can hook into.
+      // In virtualized mode with windowing, we rely on scroll position to determine active index usually.
+      // BUT if we are programmatically navigating, we want to update the index state.
+      if (targetBehavior === 'instant' || !isControlled) {
+        applyIndexChange(next);
       }
     },
-    [applyIndexChange, isControlled, items.length, loop, resolvedMode, rawScrollTo, virtualizer.scrollToIndex],
+    [applyIndexChange, isControlled, items.length, loop, virtualizer.scrollToIndex],
   );
 
   const wheel = useWheel({
@@ -176,12 +157,14 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     setAnimating: setIsAnimating,
     isAnimating,
     onDragStart: () => {
-      if (resolvedMode === "virtualized" && viewportRef.current) {
+      if (viewportRef.current) {
+        // Optimization: Force auto behavior immediately on drag start
+        viewportRef.current.style.scrollBehavior = 'auto';
         dragStartScrollRef.current = orientation === "vertical" ? viewportRef.current.scrollTop : viewportRef.current.scrollLeft;
       }
     },
     onDrag: (delta) => {
-      if (resolvedMode === "virtualized" && viewportRef.current) {
+      if (viewportRef.current) {
         const newScroll = dragStartScrollRef.current - delta;
         if (orientation === "vertical") {
           viewportRef.current.scrollTop = newScroll;
@@ -212,28 +195,35 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   // We should be careful not to fight with virtualizer.
   // virtualizer.range gives us visible items. 
   // We want the "Main" active item (center).
-  const handleScroll = useCallback(() => {
-    const viewport = viewportRef.current;
-    if (!viewport) return;
-    const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
-    const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+  const rafId = useRef<number | null>(null);
 
-    // Efficiently find active index without looping all
-    // We can use virtualizer.getVirtualItems() to narrow search space!
-    const visible = virtualizer.virtualItems;
-    if (visible.length > 0) {
-      // Find the one covering center
-      const center = scrollOffset + viewportSize / 2;
-      const match = visible.find(v => {
-        const end = v.offset + v.size;
-        return v.offset <= center && end >= center;
-      });
-      if (match) {
-        applyIndexChange(match.index);
+  const handleScroll = useCallback(() => {
+    if (rafId.current !== null) return;
+
+    rafId.current = requestAnimationFrame(() => {
+      rafId.current = null;
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+      const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+      const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+
+      // Efficiently find active index without looping all
+      // We can use virtualizer.virtualItems from the closure, 
+      // but ideally we want fresh state if possible. 
+      // Luckily validation runs often.
+      const visible = virtualizer.virtualItems;
+      if (visible.length > 0) {
+        // Find the one covering center
+        const center = scrollOffset + viewportSize / 2;
+        const match = visible.find(v => {
+          const end = v.offset + v.size;
+          return v.offset <= center && end >= center;
+        });
+        if (match) {
+          applyIndexChange(match.index);
+        }
       }
-    } else {
-      // Fallback?
-    }
+    });
 
     // visibility.calculateFromPosition(scrollOffset, viewportSize); // DISABLE OLD LOOP
   }, [orientation, virtualizer.virtualItems, applyIndexChange]);
@@ -279,23 +269,24 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       isAnimating,
       canPrev: loop || index > 0,
       canNext: loop || index < items.length - 1,
-      resolvedMode,
     }),
-    [index, isAnimating, items.length, loop, resolvedMode],
+    [index, isAnimating, items.length, loop],
   );
 
   const getViewportProps = useCallback(() => {
-    const isVertical = orientation === "vertical";
-    const nativeScrollStyles: React.CSSProperties =
-      resolvedMode === "native"
-        ? {
-          overflowY: isVertical ? "auto" : "hidden",
-          overflowX: isVertical ? "hidden" : "auto",
-          scrollSnapType: isVertical ? "y mandatory" : "x mandatory",
-          overscrollBehavior: "contain",
-          position: "relative" as const,
-        }
-        : ({ position: "relative", overflow: "auto" } as React.CSSProperties);
+    // const isVertical = orientation === "vertical";
+    const virtualStyles: React.CSSProperties = {
+      position: "relative",
+      overflow: "auto",
+      // Native Scroll Snap
+      scrollSnapType: orientation === "vertical" ? "y mandatory" : "x mandatory",
+      // Ensure native scroll works
+      touchAction: orientation === "vertical" ? "pan-y" : "pan-x",
+
+      // Remove manual scroll-behavior toggling, let snap handle it
+      // scrollBehavior: "smooth", 
+      willChange: "scroll-position", // Optimizes scrolling
+    };
 
     return {
       ref: (el: HTMLElement | null) => {
@@ -308,46 +299,39 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       onScroll: handleScroll,
       onWheel: wheel.onWheel,
       onKeyDown: keyboard.onKeyDown,
-      ...gestures.handlers,
-      style: nativeScrollStyles,
+      // Disable manual gesture handlers for drag to allow native scroll
+      // ...gestures.handlers, 
+      style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, gestures.handlers, handleScroll, isAnimating, keyboard.onKeyDown, resolvedMode, wheel.onWheel, orientation]);
+  }, [ariaLabel, handleScroll, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {
       const virtual = virtualizer.virtualItems.find(v => v.index === itemIndex);
       const isActive = index === itemIndex;
 
-      if (resolvedMode === "virtualized") {
-        return {
-          ref: (virtual ? virtual.measureElement : undefined) as React.RefCallback<HTMLElement>,
-          "data-index": itemIndex,
-          "data-active": isActive,
-          style: {
-            position: "absolute" as const,
-            top: 0,
-            left: 0,
-            transform: orientation === 'vertical'
-              ? `translateY(${virtual ? virtual.offset : 0}px)`
-              : `translateX(${virtual ? virtual.offset : 0}px)`,
-            height: orientation === 'vertical' ? (virtual ? virtual.size : undefined) : '100%',
-            width: orientation === 'horizontal' ? (virtual ? virtual.size : undefined) : '100%',
-            willChange: "transform",
-          },
-        };
-      }
-
       return {
-        ref: () => { },
+        ref: (virtual ? virtual.measureElement : undefined) as React.RefCallback<HTMLElement>,
         "data-index": itemIndex,
         "data-active": isActive,
         style: {
+          position: "absolute" as const,
+          top: 0,
+          left: 0,
+          transform: orientation === 'vertical'
+            ? `translateY(${virtual ? virtual.offset : 0}px)`
+            : `translateX(${virtual ? virtual.offset : 0}px)`,
+          height: orientation === 'vertical' ? (virtual ? virtual.size : undefined) : '100%',
+          width: orientation === 'horizontal' ? (virtual ? virtual.size : undefined) : '100%',
+          willChange: "transform",
+          contain: "layout paint",
+          // Native Snap Item Styles
           scrollSnapAlign: "start",
-          scrollSnapStop: "always",
+          scrollSnapStop: "always" as any,
         },
-      } as const;
+      };
     },
-    [index, resolvedMode, virtualizer.virtualItems, orientation],
+    [index, virtualizer.virtualItems, orientation],
   );
 
   const api: SwipeDeckAPI<T> = {
@@ -364,4 +348,3 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   return api;
 }
-

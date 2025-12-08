@@ -180,38 +180,9 @@ const VideoCard = ({ item, isActive }: { item: VideoItem; isActive: boolean }) =
 
 // --- Feeds ---
 
-function NativeFeed({ items }: { items: VideoItem[] }) {
-  const deck = useSwipeDeck({
-    items,
-    orientation: "vertical",
-    mode: "native",
-    wheel: { discretePaging: true }
-  });
+// --- Feeds ---
 
-  return (
-    <div
-      {...deck.getViewportProps()}
-      className="w-full h-full snap-y-mandatory overflow-y-scroll scrollbar-hide touch-pan-y"
-      style={deck.getViewportProps().style}
-    >
-      {deck.virtualItems.map((virtualItem) => (
-        <div
-          key={virtualItem.key}
-          {...deck.getItemProps(virtualItem.index)}
-          className="w-full h-full snap-start relative"
-          style={{
-            ...deck.getItemProps(virtualItem.index).style,
-            height: "100%", width: "100%", flexShrink: 0
-          }}
-        >
-          <VideoCard item={items[virtualItem.index]} isActive={deck.index === virtualItem.index} />
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function VirtualizedFeed({ items }: { items: VideoItem[] }) {
+function SwipeFeed({ items }: { items: VideoItem[] }) {
   const { height } = useWindowSize();
 
   // Fallback to avoid 0 height on initial render
@@ -220,7 +191,7 @@ function VirtualizedFeed({ items }: { items: VideoItem[] }) {
   const deck = useSwipeDeck({
     items,
     orientation: "vertical",
-    mode: "virtualized",
+    // Unified mode is virtualized by default
     virtual: {
       estimatedSize: itemHeight,
     },
@@ -234,7 +205,7 @@ function VirtualizedFeed({ items }: { items: VideoItem[] }) {
     <div
       {...deck.getViewportProps()}
       className="w-full h-full overflow-hidden relative"
-      style={{ ...deck.getViewportProps().style, touchAction: 'none' }}
+      style={{ ...deck.getViewportProps().style }}
     >
       <div style={{ height: totalHeight, position: "relative", width: "100%" }}>
         {deck.virtualItems.map((virtualItem) => {
@@ -264,9 +235,8 @@ function VirtualizedFeed({ items }: { items: VideoItem[] }) {
 // --- App ---
 
 function App() {
-  const [mode, setMode] = useState<FeedMode>("native");
-
-  const items = mode === "native" ? SMALL_DATA_SET : LARGE_DATA_SET;
+  // Use large dataset by default for "real" feel, or togglable count
+  const items = LARGE_DATA_SET;
 
   return (
     <main className="w-full h-full relative" style={{ color: 'white', background: 'black' }}>
@@ -277,21 +247,13 @@ function App() {
         </div>
 
         <div className="nav-links flex items-center justify-center">
-          <button
-            onClick={() => setMode("native")}
-            className={mode === "native" ? "nav-link-active" : ""}
-            style={{ background: 'none', border: 'none', color: mode === "native" ? 'white' : 'rgba(255,255,255,0.6)', fontSize: '16px', fontWeight: '700', cursor: 'pointer', paddingBottom: '4px' }}
-          >
-            Native
-          </button>
-          <span style={{ opacity: 0.2 }}>|</span>
-          <button
-            onClick={() => setMode("virtualized")}
-            className={mode === "virtualized" ? "nav-link-active" : ""}
-            style={{ background: 'none', border: 'none', color: mode === "virtualized" ? 'white' : 'rgba(255,255,255,0.6)', fontSize: '16px', fontWeight: '700', cursor: 'pointer', paddingBottom: '4px' }}
-          >
-            Virtualized
-          </button>
+          <span className="nav-link-active" style={{ fontSize: '16px', fontWeight: '700' }}>
+            Following
+          </span>
+          <span style={{ opacity: 0.2, margin: '0 8px' }}>|</span>
+          <span style={{ fontSize: '16px', fontWeight: '700', opacity: 0.6 }}>
+            For You
+          </span>
         </div>
 
         <div style={{ width: '40px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -301,11 +263,7 @@ function App() {
 
       {/* Content */}
       <div className="w-full h-full">
-        {mode === "native" ? (
-          <NativeFeed items={items} />
-        ) : (
-          <VirtualizedFeed items={items} />
-        )}
+        <SwipeFeed items={items} />
       </div>
 
       {/* Bottom Nav */}

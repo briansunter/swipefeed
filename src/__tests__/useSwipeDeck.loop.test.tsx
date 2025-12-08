@@ -19,7 +19,7 @@ describe("useSwipeDeck loop + controlled reconciliation", () => {
     const { result } = renderHook(() =>
       useSwipeDeck({
         items: [1, 2, 3],
-        mode: "virtualized",
+
         loop: true,
       }),
     );
@@ -35,7 +35,7 @@ describe("useSwipeDeck loop + controlled reconciliation", () => {
       ({ idx }) =>
         useSwipeDeck({
           items: [1, 2, 3],
-          mode: "virtualized",
+
           index: idx,
           onIndexChange,
         }),

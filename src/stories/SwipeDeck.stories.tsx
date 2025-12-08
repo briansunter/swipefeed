@@ -37,20 +37,20 @@ export const VerticalNative: Story = {
     children: ({ item, props, isActive }: { item: DemoItem; props: React.HTMLAttributes<HTMLElement>; isActive: boolean }) => {
       const typed = item as DemoItem;
       return (
-      <div
-        {...props}
-        style={{
-          height: "80vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: isActive ? "#0ea5e9" : "#0f172a",
-          color: "white",
-        }}
-      >
-        {typed.title} {isActive ? "(active)" : ""}
-      </div>
-    );
+        <div
+          {...props}
+          style={{
+            height: "80vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isActive ? "#0ea5e9" : "#0f172a",
+            color: "white",
+          }}
+        >
+          {typed.title} {isActive ? "(active)" : ""}
+        </div>
+      );
     },
   },
 };
@@ -58,28 +58,28 @@ export const VerticalNative: Story = {
 export const VirtualizedFeed: Story = {
   args: {
     items: largeItems,
-    mode: "virtualized",
+
     virtual: { estimatedSize: 600 },
     orientation: "vertical",
     children: ({ item, props, isActive }: { item: DemoItem; props: React.HTMLAttributes<HTMLElement>; isActive: boolean }) => {
       const typed = item as DemoItem;
       return (
-      <div
-        {...props}
-        style={{
-          position: "absolute",
-          inset: 0,
-          height: "100vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: isActive ? "#22c55e" : "#0f172a",
-          color: "white",
-        }}
-      >
-        {typed.title}
-      </div>
-    );
+        <div
+          {...props}
+          style={{
+            position: "absolute",
+            inset: 0,
+            height: "100vh",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: isActive ? "#22c55e" : "#0f172a",
+            color: "white",
+          }}
+        >
+          {typed.title}
+        </div>
+      );
     },
   },
 };
@@ -88,29 +88,29 @@ export const HorizontalStories: Story = {
   args: {
     items: storiesItems,
     orientation: "horizontal",
-    mode: "native",
+
     loop: true,
     wheel: { discretePaging: false },
     children: ({ item, props, isActive }: { item: DemoItem; props: React.HTMLAttributes<HTMLElement>; isActive: boolean }) => {
       const typed = item as DemoItem;
       return (
-      <div
-        {...props}
-        style={{
-          width: 220,
-          height: 320,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          margin: "0 8px",
-          background: isActive ? "#a855f7" : "#1f2937",
-          color: "white",
-          borderRadius: 12,
-        }}
-      >
-        {typed.title}
-      </div>
-    );
+        <div
+          {...props}
+          style={{
+            width: 220,
+            height: 320,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 8px",
+            background: isActive ? "#a855f7" : "#1f2937",
+            color: "white",
+            borderRadius: 12,
+          }}
+        >
+          {typed.title}
+        </div>
+      );
     },
   },
 };
@@ -124,20 +124,20 @@ export const Controlled: Story = {
         {({ item, props, isActive }: { item: DemoItem; props: React.HTMLAttributes<HTMLElement>; isActive: boolean }) => {
           const typed = item as DemoItem;
           return (
-          <div
-            {...props}
-            style={{
-              height: "80vh",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background: isActive ? "#f59e0b" : "#0f172a",
-              color: "white",
-            }}
-          >
-            {typed.title} (index {index})
-          </div>
-        );
+            <div
+              {...props}
+              style={{
+                height: "80vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: isActive ? "#f59e0b" : "#0f172a",
+                color: "white",
+              }}
+            >
+              {typed.title} (index {index})
+            </div>
+          );
         }}
       </SwipeDeck>
     );
