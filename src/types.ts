@@ -90,6 +90,7 @@ export interface SwipeDeckVirtualItem {
   offset: number;
   size: number;
   key: string | number;
+  measureElement?: (el: Element | null) => void;
 }
 
 export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
@@ -102,6 +103,7 @@ export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
     "data-active": boolean;
   };
   virtualItems: SwipeDeckVirtualItem[];
+  totalSize: number;
   items: readonly T[];
 }
 

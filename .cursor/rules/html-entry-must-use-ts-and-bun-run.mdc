@@ -1,0 +1,4 @@
+## HTML entry rules
+
+- In example HTML, the module script should import the TypeScript entry (e.g. `./index.ts`), not the built `.js` bundle.
+- To serve the example, use Bun: `bun run --hot --watch example/index.html` (or the equivalent `bun run example:dev` script). Avoid npm/vite/pnpm.

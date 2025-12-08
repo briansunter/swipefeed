@@ -22,6 +22,10 @@ type UseGesturesParams = {
   maxIndex: number;
   onRequestIndexChange: (nextIndex: number) => void;
   setAnimating: (value: boolean) => void;
+  isAnimating: boolean;
+  onDragStart?: (evt: React.PointerEvent) => void;
+  onDrag?: (delta: number, evt: React.PointerEvent) => void;
+  onDragEnd?: () => void;
 };
 
 function primaryCoord(evt: PointerEvent | React.PointerEvent, orientation: Orientation) {
@@ -45,6 +49,10 @@ export function useGestures(params: UseGesturesParams) {
     maxIndex,
     onRequestIndexChange,
     setAnimating,
+    isAnimating,
+    onDragStart,
+    onDrag,
+    onDragEnd,
   } = params;
 
   const [isDragging, setIsDragging] = useState(false);
@@ -67,7 +75,8 @@ export function useGestures(params: UseGesturesParams) {
       startTime: performance.now(),
     };
     setIsDragging(true);
-  }, [orientation]);
+    onDragStart?.(evt);
+  }, [orientation, onDragStart]);
 
   const updateDrag = useCallback((evt: React.PointerEvent) => {
     if (!state.current.isDragging) return;
@@ -76,7 +85,8 @@ export function useGestures(params: UseGesturesParams) {
     const delta = coord - state.current.start;
     state.current.delta = delta;
     state.current.last = coord;
-  }, [orientation]);
+    onDrag?.(delta, evt);
+  }, [orientation, onDrag]);
 
   const endDrag = useCallback(() => {
     if (!state.current.isDragging) return;
@@ -116,7 +126,8 @@ export function useGestures(params: UseGesturesParams) {
     state.current.isDragging = false;
     state.current.delta = 0;
     setIsDragging(false);
-  }, [direction, flickVelocity, getIndex, maxIndex, onRequestIndexChange, orientation, loop, setAnimating, threshold]);
+    onDragEnd?.();
+  }, [direction, flickVelocity, getIndex, maxIndex, onRequestIndexChange, orientation, loop, setAnimating, threshold, onDragEnd]);
 
   const cancelDrag = useCallback(() => {
     state.current.isDragging = false;

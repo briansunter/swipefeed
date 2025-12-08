@@ -15,7 +15,8 @@ function Wrapper({ onRequestIndexChange }: { onRequestIndexChange: (n: number) =
     getIndex: () => 0,
     maxIndex: 2,
     onRequestIndexChange,
-    setAnimating: () => {},
+    setAnimating: () => { },
+    isAnimating: false,
   });
   return <div data-testid="target" {...handlers} />;
 }

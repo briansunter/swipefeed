@@ -1,0 +1,381 @@
+/* Base Setup */
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  background: black;
+  overflow: hidden;
+  color: white;
+}
+
+/* Utilities */
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+
+.relative {
+  position: relative;
+}
+
+.absolute {
+  position: absolute;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.flex {
+  display: flex;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.pointer-events-none {
+  pointer-events: none;
+}
+
+.pointer-events-auto {
+  pointer-events: auto;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* NATIVE SCROLL FIX */
+.overflow-y-auto {
+  overflow-y: auto;
+}
+
+/* Scroll Snap */
+.snap-y-mandatory {
+  scroll-snap-type: y mandatory;
+}
+
+.snap-start {
+  scroll-snap-align: start;
+}
+
+.snap-always {
+  scroll-snap-stop: always;
+}
+
+/* Hide Scrollbar */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Touch Action */
+.touch-pan-y {
+  touch-action: pan-y;
+}
+
+/* --- Components --- */
+
+/* Action Button */
+.action-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 20px;
+  transition: transform 0.1s;
+}
+
+.action-button:active {
+  transform: scale(0.9);
+}
+
+.action-icon-circle {
+  /* Removed circle background for standard actions to match TikTok's transparent look, 
+     but kept sizing for consistent hit target */
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  /* Reduced margin */
+  /* text-shadow: 0 2px 4px rgba(0,0,0,0.3); */
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.action-label {
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Video Overlay */
+.video-overlay-container {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: 80px;
+  /* Space for bottom nav */
+}
+
+.video-info {
+  padding-left: 16px;
+  padding-bottom: 20px;
+  width: 70%;
+  text-align: left;
+  z-index: 10;
+}
+
+.info-username {
+  font-weight: 700;
+  font-size: 17px;
+  margin: 0 0 8px 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.info-description {
+  font-size: 15px;
+  margin: 0 0 10px 0;
+  line-height: 1.3;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.info-music-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.sidebar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-right: 8px;
+  padding-bottom: 20px;
+  width: 60px;
+  z-index: 10;
+}
+
+/* Avatar */
+.avatar-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.avatar-circle {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #eee;
+  border: 1px solid white;
+  background-image: url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix');
+  /* Placeholder */
+  background-size: cover;
+}
+
+.avatar-plus {
+  position: absolute;
+  bottom: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 22px;
+  height: 22px;
+  background: #fe2c55;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 18px;
+  border: 2px solid white;
+}
+
+/* Disc */
+.disc-spin {
+  width: 48px;
+  height: 48px;
+  background: #222;
+  /* Dark vinyl look */
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 8px solid #111;
+  animation: spin 5s linear infinite;
+  margin-top: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.disc-spin::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-image: url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix');
+  background-size: cover;
+  border-radius: 50%;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Modal */
+/* Removed modal styles as we switched to top nav toggles */
+
+/* Navigation */
+.top-nav {
+  padding-top: 50px;
+  /* Safe area */
+  z-index: 50;
+  /* background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent); */
+}
+
+.nav-links {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 17px;
+  font-weight: 600;
+  color: white;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.nav-link-active {
+  opacity: 1;
+  border-bottom: 2px solid white;
+  padding-bottom: 4px;
+}
+
+.bottom-nav {
+  /* Using fixed height matching iOS standards approx 83px inc home bar */
+  height: 60px;
+  bottom: 0;
+  background: black;
+  /* Solid black or very dark gradient for contrast */
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  z-index: 50;
+  padding-bottom: 5px;
+  /* Home indicator space */
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  gap: 4px;
+}
+
+.nav-item.active {
+  color: white;
+}
+
+.nav-icon {
+  width: 28px;
+  height: 28px;
+  /* SVGs will be styled inline */
+}
+
+.nav-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* Upload Button Custom */
+.upload-btn {
+  width: 45px;
+  height: 30px;
+  position: relative;
+  background: white;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-btn::before {
+  content: '';
+  position: absolute;
+  left: -4px;
+  width: 45px;
+  height: 30px;
+  background: #65D2E9;
+  /* Cyan */
+  border-radius: 8px;
+  z-index: -1;
+}
+
+.upload-btn::after {
+  content: '';
+  position: absolute;
+  right: -4px;
+  width: 45px;
+  height: 30px;
+  background: #E5436D;
+  /* Red */
+  border-radius: 8px;
+  z-index: -2;
+}
+
+.upload-plus {
+  color: black;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
