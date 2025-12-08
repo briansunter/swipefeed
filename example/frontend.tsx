@@ -135,31 +135,34 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
 
   // Sync Playback State
   useEffect(() => {
-    if (!iframeRef.current) return;
+    if (!iframeRef.current || !isReady) return;
     const action = isActive ? "playVideo" : "pauseVideo";
     iframeRef.current.contentWindow?.postMessage(
       JSON.stringify({ event: "command", func: action, args: [] }),
       "*"
     );
-  }, [isActive]);
+  }, [isActive, isReady]);
 
   // Sync Mute State
   useEffect(() => {
-    if (!iframeRef.current) return;
+    if (!iframeRef.current || !isReady) return;
     const action = isMuted ? "mute" : "unMute";
     iframeRef.current.contentWindow?.postMessage(
       JSON.stringify({ event: "command", func: action, args: [] }),
       "*"
     );
-  }, [isMuted]);
+  }, [isMuted, isReady]);
 
   const toggleMute = (e: React.MouseEvent | React.TouchEvent) => {
     e.stopPropagation();
     setIsMuted(!isMuted);
   };
 
-  // Note: mute=1 is required for autoplay on many mobile browsers (Safari iOS)
-  const embedUrl = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=${isActive ? 1 : 0}&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1`;
+  // Stable URL: Removed 'isActive' from dependency.
+  // CRITICAL: Set autoplay=1 to force player initialization and loading of the "Real" video frame.
+  // We rely on the useEffect(isActive) to immediately send 'pauseVideo' for off-screen items.
+  // This ensures the video is buffered/ready and showing video content, not just a thumbnail.
+  const embedUrl = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1`;
   const thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
 
   return (
@@ -174,7 +177,7 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
         className="w-full h-full object-cover"
         style={{
           pointerEvents: 'none',
-          opacity: isActive && isReady ? 1 : 0,
+          opacity: 1, // Always show iframe, just control playback
           transition: 'opacity 0.4s ease-in',
           transform: 'scale(1.35)',
           transformOrigin: 'center center'
@@ -216,7 +219,7 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
       <div
         className="absolute inset-0 bg-black"
         style={{
-          opacity: isActive && isReady ? 0 : 1,
+          opacity: isReady ? 0 : 1,
           transition: 'opacity 0.4s ease-out',
           pointerEvents: 'none',
           zIndex: 1
