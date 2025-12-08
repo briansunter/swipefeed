@@ -1,11 +1,12 @@
 import { createRoot } from "react-dom/client";
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { SwipeDeck, useSwipeDeck } from "../src";
 import "./index.css";
 
 // --- Types ---
 type VideoItem = {
   id: string;
+  youtubeId: string;
   username: string;
   description: string;
   music: string;
@@ -15,29 +16,40 @@ type VideoItem = {
   color: string;
 };
 
-type FeedMode = "native" | "virtualized";
+// --- YouTube Shorts Data ---
+const REAL_SHORTS = [
+  { youtubeId: "9R5lKECPTSE", username: "@user_1", description: "Viral Short #1", music: "Sound 1", color: "#4CAF50" },
+  { youtubeId: "5xkpJkaxT9A", username: "@user_2", description: "Viral Short #2", music: "Sound 2", color: "#FF9800" },
+  { youtubeId: "fysFPjbLzlY", username: "@user_3", description: "Viral Short #3", music: "Sound 3", color: "#E91E63" },
+  { youtubeId: "RSjq1YtYarY", username: "@user_4", description: "Viral Short #4", music: "Sound 4", color: "#9C27B0" },
+  { youtubeId: "iQaymOlRQxM", username: "@user_5", description: "Viral Short #5", music: "Sound 5", color: "#2196F3" },
+];
 
-// --- Mock Data ---
-const generateVideos = (count: number): VideoItem[] => Array.from({ length: count }, (_, i) => ({
-  id: `video-${i}`,
-  username: `@user_${i + 1}`,
-  description: `TikTok clone in ${count > 50 ? "Virtualized" : "Native"} mode! Item #${i + 1}`,
-  music: `Original Sound - @user_${i + 1}`,
-  likes: `${(Math.random() * 500).toFixed(1)}K`,
-  comments: `${Math.floor(Math.random() * 1000)}`,
-  shares: `${Math.floor(Math.random() * 500)}`,
-  color: `hsl(${Math.random() * 360}, 70%, 60%)`,
-}));
+const generateVideos = (count: number): VideoItem[] => {
+  return Array.from({ length: count }, (_, i) => {
+    const template = REAL_SHORTS[i % REAL_SHORTS.length];
+    return {
+      id: `video-${i}`,
+      youtubeId: template.youtubeId,
+      username: template.username,
+      description: `TikTok clone item #${i + 1}: ${template.description}`,
+      music: template.music,
+      likes: `${(Math.random() * 500).toFixed(1)}K`,
+      comments: `${Math.floor(Math.random() * 1000)}`,
+      shares: `${Math.floor(Math.random() * 500)}`,
+      color: template.color,
+    };
+  });
+};
 
-const SMALL_DATA_SET = generateVideos(20);
-const LARGE_DATA_SET = generateVideos(1000);
+const DATA_SET = generateVideos(20);
 
 // --- Icons (Inline SVGs) ---
 const HeartIcon = () => (
   <svg width="36" height="36" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
     <path d="M24 41.95L21.05 39.2C10.55 29.7 3.65 23.45 3.65 15.75C3.65 9.45 8.6 4.45 14.9 4.45C18.45 4.45 21.85 6.1 24 8.6C26.15 6.1 29.55 4.45 33.1 4.45C39.4 4.45 44.35 9.45 44.35 15.75C44.35 23.45 37.45 29.7 26.95 39.2L24 41.95Z" fill="#fff" />
   </svg>
-); // Solid for now, typical is Outline unless liked
+);
 
 const CommentIcon = () => (
   <svg width="34" height="34" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
@@ -54,21 +66,6 @@ const BookmarkIcon = () => (
 const ShareIcon = () => (
   <svg width="34" height="34" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
     <path d="M37.3 18.55V8.85L47.4 20.95L37.3 33.05V23.75C24.1 23.75 14.9 28 8.6 37.05C9.7 26.65 19.3 18.85 37.3 18.55Z" fill="#fff" />
-  </svg>
-);
-
-const LiveIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 48 48" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.8 }}>
-    <rect x="4" y="8" width="40" height="28" rx="2" />
-    <path d="M14 41L34 41" />
-    <path d="M24 36V41" />
-  </svg>
-);
-
-const SearchIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 48 48" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.8 }}>
-    <circle cx="20.5" cy="20.5" r="13" />
-    <path d="M30 30L41 41" />
   </svg>
 );
 
@@ -131,6 +128,112 @@ const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: 
   </button>
 );
 
+const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: boolean }) => {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+
+  // Sync Playback State
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const action = isActive ? "playVideo" : "pauseVideo";
+    iframeRef.current.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: action, args: [] }),
+      "*"
+    );
+  }, [isActive]);
+
+  // Sync Mute State
+  useEffect(() => {
+    if (!iframeRef.current) return;
+    const action = isMuted ? "mute" : "unMute";
+    iframeRef.current.contentWindow?.postMessage(
+      JSON.stringify({ event: "command", func: action, args: [] }),
+      "*"
+    );
+  }, [isMuted]);
+
+  const toggleMute = (e: React.MouseEvent | React.TouchEvent) => {
+    e.stopPropagation();
+    setIsMuted(!isMuted);
+  };
+
+  // Note: mute=1 is required for autoplay on many mobile browsers (Safari iOS)
+  const embedUrl = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=${isActive ? 1 : 0}&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1`;
+  const thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
+
+  return (
+    <div className="youtube-player-wrapper w-full h-full relative overflow-hidden bg-black">
+      {/* 
+         Scale 1.35x to push standard YouTube top-bar/title out of visible area.
+         Pointer-events: none ensures swipes go through to the SwipeDeck container.
+      */}
+      <iframe
+        ref={iframeRef}
+        src={embedUrl}
+        className="w-full h-full object-cover"
+        style={{
+          pointerEvents: 'none',
+          opacity: isActive && isReady ? 1 : 0,
+          transition: 'opacity 0.4s ease-in',
+          transform: 'scale(1.35)',
+          transformOrigin: 'center center'
+        }}
+        title="YouTube video player"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        onLoad={() => setIsReady(true)}
+      />
+
+      {/* Custom Volume Control - Integrated into side actions via absolute positioning matching sidebar */}
+      {isActive && (
+        <div className="absolute right-2 bottom-40 z-50 flex flex-col items-center" style={{ bottom: '380px', right: '8px' }}>
+          {/* Position roughly above the first sidebar item or integrated. 
+                 The Sidebar is in VideoOverlay. 
+                 To align perfectly, we'd ideally move this to VideoOverlay, but state is here.
+                 Visual approximation: Sidebar is bottom-aligned. 
+                 We'll place this nicely on the side.
+            */}
+          <button
+            onClick={toggleMute}
+            className="flex flex-col items-center justify-center mb-4"
+            style={{ pointerEvents: 'auto', width: '40px', height: '40px', background: 'rgba(0,0,0,0.4)', borderRadius: '50%' }}
+          >
+            {isMuted ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" /></svg>
+            )}
+          </button>
+          <span style={{ fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.5)', marginTop: '-4px' }}>
+            {isMuted ? 'Unmute' : 'Mute'}
+          </span>
+        </div>
+      )}
+
+      {/* Placeholder / Cover */}
+      <div
+        className="absolute inset-0 bg-black"
+        style={{
+          opacity: isActive && isReady ? 0 : 1,
+          transition: 'opacity 0.4s ease-out',
+          pointerEvents: 'none',
+          zIndex: 1
+        }}
+      >
+        {/* Only show thumb if not ready, to avoid flash */}
+        <img
+          src={thumbnailUrl}
+          alt="Cover"
+          className="w-full h-full object-cover opacity-80"
+        />
+      </div>
+
+    </div>
+  );
+};
+
 const VideoOverlay = ({ item }: { item: VideoItem }) => {
   return (
     <div className="absolute inset-0 video-overlay-container pointer-events-none">
@@ -148,7 +251,7 @@ const VideoOverlay = ({ item }: { item: VideoItem }) => {
           </div>
         </div>
 
-        <div className="sidebar-container">
+        <div className="sidebar-container" style={{ paddingBottom: '20px' }}>
           <div className="avatar-wrapper">
             <div className="avatar-circle"></div>
             <div className="avatar-plus">+</div>
@@ -172,13 +275,12 @@ const VideoCard = ({ item, isActive }: { item: VideoItem; isActive: boolean }) =
         background: `linear-gradient(180deg, ${item.color} 0%, #000 120%)`,
       }}
     >
+      <YouTubePlayer youtubeId={item.youtubeId} isActive={isActive} />
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.6) 100%)' }} />
       <VideoOverlay item={item} />
     </div>
   );
 };
-
-// --- Feeds ---
 
 // --- Feeds ---
 
@@ -191,12 +293,23 @@ function SwipeFeed({ items }: { items: VideoItem[] }) {
   const deck = useSwipeDeck({
     items,
     orientation: "vertical",
-    // Unified mode is virtualized by default
+    loop: false,
     virtual: {
       estimatedSize: itemHeight,
     },
+    // The user requested: "next video starts playing when it's dragged more than halfway"
+    // Our 'useSwipeDeck' already updates the 'index' when the center point of the item crosses the center of the viewport.
+    // This is essentially "dragged more than halfway".
+    // When 'index' updates, 'isActive' becomes true for the next video.
+    // So the layout logic in useSwipeDeck.ts:handleScroll matches this requirement.
+
     wheel: { discretePaging: true },
-    gesture: { lockAxis: true, ignoreWhileAnimating: false },
+    gesture: {
+      lockAxis: true,
+      ignoreWhileAnimating: false,
+      // We might want to tune threshold to be easier?
+      threshold: 10,
+    },
   });
 
   const totalHeight = deck.totalSize;
@@ -235,30 +348,25 @@ function SwipeFeed({ items }: { items: VideoItem[] }) {
 // --- App ---
 
 function App() {
-  // Use large dataset by default for "real" feel, or togglable count
-  const items = LARGE_DATA_SET;
+  const items = DATA_SET;
 
   return (
     <main className="w-full h-full relative" style={{ color: 'white', background: 'black' }}>
       {/* Header */}
-      <header className="absolute top-nav w-full flex justify-between items-start px-4" style={{ paddingLeft: '16px', paddingRight: '16px' }}>
-        <div style={{ width: '40px' }}>
-          {/* Live Icon Removed */}
-        </div>
+      <header className="absolute top-nav w-full flex justify-between items-start px-4" style={{ top: '24px', paddingLeft: '16px', paddingRight: '16px', zIndex: 50 }}>
+        <div style={{ width: '40px' }}></div>
 
         <div className="nav-links flex items-center justify-center">
-          <span className="nav-link-active" style={{ fontSize: '16px', fontWeight: '700' }}>
+          <span className="nav-link-active" style={{ fontSize: '18px', fontWeight: '700', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
             Following
           </span>
           <span style={{ opacity: 0.2, margin: '0 8px' }}>|</span>
-          <span style={{ fontSize: '16px', fontWeight: '700', opacity: 0.6 }}>
+          <span style={{ fontSize: '18px', fontWeight: '700', opacity: 0.6, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
             For You
           </span>
         </div>
 
-        <div style={{ width: '40px', display: 'flex', justifyContent: 'flex-end' }}>
-          {/* Search Icon Removed */}
-        </div>
+        <div style={{ width: '40px', display: 'flex', justifyContent: 'flex-end' }}></div>
       </header>
 
       {/* Content */}
@@ -276,7 +384,7 @@ function App() {
           <FriendsIcon active={false} />
           <span className="nav-label">Friends</span>
         </button>
-        <div className="upload-wrapper"> {/* wrapper for centering */}
+        <div className="upload-wrapper">
           <button className="upload-btn">
             <span className="upload-plus">+</span>
           </button>
