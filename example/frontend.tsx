@@ -113,11 +113,11 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
 // --- Components ---
 
 const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) => (
-  <button className="action-button" onClick={onClick}>
-    <div className="action-icon-circle">
+  <button className="flex flex-col items-center bg-transparent border-none cursor-pointer p-0 mb-3.5 transition-opacity duration-200 active:opacity-70 active:scale-95" onClick={onClick}>
+    <div className="w-10 h-10 flex items-center justify-center mb-0.5">
       {icon}
     </div>
-    <span className="action-label">{label}</span>
+    <span className="text-white text-[11px] font-semibold drop-shadow-md tracking-wide text-center">{label}</span>
   </button>
 );
 
@@ -125,23 +125,7 @@ const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: 
 const MuteButton = ({ isMuted, toggleMute }: { isMuted: boolean; toggleMute: () => void }) => (
   <button
     onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-    style={{
-      position: 'fixed',
-      left: '16px',
-      top: '16px',
-      zIndex: 9999,
-      width: '32px',
-      height: '32px',
-      background: 'rgba(0,0,0,0.35)',
-      borderRadius: '50%',
-      backdropFilter: 'blur(4px)',
-      border: '1px solid rgba(255,255,255,0.2)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      pointerEvents: 'auto'
-    }}
+    className="fixed left-4 top-4 z-[9999] w-8 h-8 bg-black/35 rounded-full backdrop-blur-sm border border-white/20 flex items-center justify-center cursor-pointer pointer-events-auto"
   >
     {isMuted ? (
       <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>
@@ -221,31 +205,33 @@ const YouTubePlayer = ({ youtubeId, isActive, isMuted }: { youtubeId: string; is
 
 const VideoOverlay = ({ item }: { item: VideoItem }) => {
   return (
-    <div className="absolute inset-0 video-overlay-container pointer-events-none">
+    <div className="absolute inset-0 flex flex-col justify-end pb-[54px] pointer-events-none">
       <div className="flex justify-between w-full pointer-events-auto items-end pb-4">
-        <div className="video-info flex-1">
-          <h3 className="info-username">{item.username}</h3>
-          <p className="info-description">{item.description}</p>
-          <div className="info-music-row">
+        <div className="flex-1 flex flex-col justify-end pl-3 pb-0 max-w-[calc(100%-70px)] z-10 text-left drop-shadow-md">
+          <h3 className="font-bold text-[17px] mb-1">{item.username}</h3>
+          <p className="text-[15px] mb-1.5 leading-[1.3] font-normal">{item.description}</p>
+          <div className="flex items-center gap-2.5 text-[13px]">
             <MusicIcon />
-            <div className="music-marquee-container">
-              <span className="music-marquee-text">
+            <div className="w-[150px] overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+              <span className="inline-block text-[13px] font-medium animate-marquee pl-2.5">
                 {item.music}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="sidebar-container">
-          <div className="avatar-wrapper">
-            <div className="avatar-circle"></div>
-            <div className="avatar-plus">+</div>
+        <div className="flex flex-col items-center pr-3 w-[50px] z-10 pb-2">
+          <div className="relative mb-[26px]">
+            <div className="w-12 h-12 rounded-full bg-gray-200 border border-white bg-cover shadow-md" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
+            <div className="absolute -bottom-[11px] left-1/2 -translate-x-1/2 w-6 h-6 bg-[#fe2c55] rounded-full flex items-center justify-center text-white text-[14px] font-bold">+</div>
           </div>
           <ActionButton icon={<HeartIcon />} label={item.likes} />
           <ActionButton icon={<CommentIcon />} label={item.comments} />
           <ActionButton icon={<BookmarkIcon />} label="Favorites" />
           <ActionButton icon={<ShareIcon />} label={item.shares} />
-          <div className="disc-spin"></div>
+          <div className="w-12 h-12 bg-[#222] rounded-full flex items-center justify-center border-[9px] border-[#161616] bg-gradient-to-b from-[#111] to-[#333] animate-spin mt-2.5 mb-0 relative overflow-hidden shadow-md">
+            <div className="absolute w-[22px] h-[22px] bg-cover rounded-full" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
+          </div>
         </div>
       </div>
     </div>
@@ -303,19 +289,19 @@ function App() {
   const [isMuted, setIsMuted] = useState(true);
 
   return (
-    <main className="w-full h-full relative" style={{ color: 'white', background: 'black' }}>
+    <main className="w-full h-full relative text-white bg-black">
 
       {/* Global Mute Button */}
       <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
 
       {/* Header */}
-      <header className="absolute top-nav w-full flex justify-center items-center" style={{ top: '0px', zIndex: 50 }}>
-        <div className="nav-links flex items-center justify-center">
-          <span className="nav-link" style={{ fontSize: '17px', fontWeight: '600', textShadow: '0 1px 2px rgba(0,0,0,0.5)', opacity: 0.7 }}>
+      <header className="absolute top-0 w-full flex justify-center items-center z-50 pt-2.5 pointer-events-none">
+        <div className="pointer-events-auto flex items-baseline text-white">
+          <span className="text-[17px] font-semibold drop-shadow-md opacity-70">
             Following
           </span>
-          <span style={{ opacity: 0.3, margin: '0 12px', fontSize: '14px' }}>|</span>
-          <span className="nav-link-active" style={{ fontSize: '18px', fontWeight: '700', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
+          <span className="opacity-30 mx-3 text-[14px]">|</span>
+          <span className="text-[18px] font-bold drop-shadow-md border-b-[3px] border-white pb-1.5 -mb-1.5">
             For You
           </span>
         </div>
@@ -327,27 +313,27 @@ function App() {
       </div>
 
       {/* Bottom Nav */}
-      <nav className="absolute bottom-nav w-full">
-        <button className="nav-item active">
+      <nav className="absolute h-[54px] bottom-0 w-full bg-black border-t border-white/15 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,20px)]">
+        <button className="flex flex-col items-center justify-center bg-transparent border-none text-white cursor-pointer gap-[3px] w-[20%]">
           <HomeIcon active={true} />
-          <span className="nav-label">Home</span>
+          <span className="text-[10px] font-semibold tracking-wide">Home</span>
         </button>
-        <button className="nav-item">
+        <button className="flex flex-col items-center justify-center bg-transparent border-none text-[#999] cursor-pointer gap-[3px] w-[20%]">
           <FriendsIcon active={false} />
-          <span className="nav-label">Friends</span>
+          <span className="text-[10px] font-semibold tracking-wide">Friends</span>
         </button>
-        <div className="upload-wrapper">
-          <button className="upload-btn">
-            <span className="upload-plus">+</span>
+        <div className="flex items-center justify-center w-[20%]">
+          <button className="w-[44px] h-[30px] relative bg-white rounded-lg flex items-center justify-center transition-transform active:scale-90 before:absolute before:-left-1 before:w-[44px] before:h-[30px] before:bg-[#25F4EE] before:rounded-lg before:-z-10 after:absolute after:-right-1 after:w-[44px] after:h-[30px] after:bg-[#FE2C55] after:rounded-lg after:-z-20">
+            <span className="text-[#121212] text-[20px] font-extrabold leading-none mt-px">+</span>
           </button>
         </div>
-        <button className="nav-item">
+        <button className="flex flex-col items-center justify-center bg-transparent border-none text-[#999] cursor-pointer gap-[3px] w-[20%]">
           <InboxIcon active={false} />
-          <span className="nav-label">Inbox</span>
+          <span className="text-[10px] font-semibold tracking-wide">Inbox</span>
         </button>
-        <button className="nav-item">
+        <button className="flex flex-col items-center justify-center bg-transparent border-none text-[#999] cursor-pointer gap-[3px] w-[20%]">
           <ProfileIcon active={false} />
-          <span className="nav-label">Profile</span>
+          <span className="text-[10px] font-semibold tracking-wide">Profile</span>
         </button>
       </nav>
     </main>
