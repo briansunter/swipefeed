@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap",
+    "docs:api": "typedoc",
     "test": "vitest run --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:coverage": "vitest run --coverage --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:browser": "vitest run --config vitest.browser.config.ts",
@@ -52,6 +53,8 @@
     "playwright": "^1.57.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "typedoc": "^0.28.15",
+    "typedoc-plugin-markdown": "^4.9.0",
     "typescript": "^5.6.3",
     "vitest": "2.1.9"
   }
