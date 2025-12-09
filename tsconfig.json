@@ -10,8 +10,16 @@
     "forceConsistentCasingInFileNames": true,
     "allowSyntheticDefaultImports": true,
     "isolatedModules": true,
-    "types": ["bun", "react", "react-dom"]
+    "types": [
+      "bun",
+      "react",
+      "react-dom"
+    ],
+    "noEmit": true
   },
-  "include": ["src", "example", "src/__tests__", "src/testing"]
+  "include": [
+    "src",
+    "src/__tests__",
+    "src/testing"
+  ]
 }
-

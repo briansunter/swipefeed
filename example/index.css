@@ -1,43 +1,35 @@
 @import "tailwindcss";
 
-/* Define animations using standard CSS to avoid v4 @theme parsing issues */
-@keyframes marquee {
-  0% {
-    transform: translateX(0);
+@theme {
+  --animate-marquee: marquee 8s linear infinite;
+  --animate-spin: spin 6s linear infinite;
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
   }
 
-  100% {
-    transform: translateX(-100%);
+  @keyframes spin {
+    from {
+      transform: rotate(0deg);
+    }
+
+    to {
+      transform: rotate(360deg);
+    }
   }
-}
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.animate-marquee {
-  animation: marquee 8s linear infinite;
-}
-
-.animate-spin {
-  animation: spin 6s linear infinite;
-}
-
-/* Global resets */
-:root {
-  font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-html,
-body,
-#root {
-  @apply h-full w-full m-0 p-0 bg-black overflow-hidden text-white;
+  --font-sans: 'Proxima Nova',
+  -apple-system,
+  BlinkMacSystemFont,
+  "Segoe UI",
+  Roboto,
+  Helvetica,
+  Arial,
+  sans-serif;
 }
