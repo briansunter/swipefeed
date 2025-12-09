@@ -1,13 +1,13 @@
 # swipefeed docs
 
-Headless React primitives for building TikTok/Reels-style swipe feeds. The library ships a render-prop component (`SwipeDeck`) and a hook (`useSwipeDeck`) that wire up native scroll-snap, TanStack virtualization, gesture/wheel/keyboard inputs, accessibility, and programmatic controls. Imports come from the package name declared in `package.json` (currently `@brian/tiktok-swipe`).
+Headless React primitives for building TikTok/Reels-style swipe feeds. The library ships a render-prop component (`SwipeDeck`) and a hook (`useSwipeDeck`) that wire up native scroll-snap, TanStack virtualization, gesture/wheel/keyboard inputs, accessibility, and programmatic controls. Imports come from the package name declared in `package.json` (currently `swipefeed`).
 
 ## Installation
 
 ```bash
-bun add @brian/tiktok-swipe
+bun add swipefeed
 # or
-npm install @brian/tiktok-swipe
+npm install swipefeed
 ```
 
 Peer deps: `react@^19`, `react-dom@^19`.
@@ -23,7 +23,7 @@ Peer deps: `react@^19`, `react-dom@^19`.
 ## Quick start — component
 
 ```tsx
-import { SwipeDeck } from "@brian/tiktok-swipe";
+import { SwipeDeck } from "swipefeed";
 
 function Feed({ items }) {
   return (
@@ -41,7 +41,7 @@ function Feed({ items }) {
 ## Quick start — hook
 
 ```tsx
-import { useSwipeDeck } from "@brian/tiktok-swipe";
+import { useSwipeDeck } from "swipefeed";
 
 function CustomLayout({ items }) {
   const deck = useSwipeDeck({ items, orientation: "horizontal", direction: "rtl" });

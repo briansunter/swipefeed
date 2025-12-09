@@ -18,9 +18,9 @@ Headless React primitives for building TikTok/Reels-style swipe feeds. Ships a r
 Using your preferred package manager:
 
 ```bash
-bun add @brian/tiktok-swipe
+bun add swipefeed
 # or
-npm install @brian/tiktok-swipe
+npm install swipefeed
 ```
 
 Peer dependencies: `react@^19`, `react-dom@^19`.
@@ -28,7 +28,7 @@ Peer dependencies: `react@^19`, `react-dom@^19`.
 ## Quick start (component)
 
 ```tsx
-import { SwipeDeck } from "@brian/tiktok-swipe";
+import { SwipeDeck } from "swipefeed";
 
 function Feed({ items }) {
   return (
@@ -49,7 +49,7 @@ function Feed({ items }) {
 ## Quick start (hook)
 
 ```tsx
-import { useSwipeDeck } from "@brian/tiktok-swipe";
+import { useSwipeDeck } from "swipefeed";
 
 function CustomLayout({ items }) {
   const deck = useSwipeDeck({ items, orientation: "horizontal", direction: "rtl" });
