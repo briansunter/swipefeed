@@ -1,6 +1,9 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useLayoutEffect, useState, useMemo } from "react";
 import { useVirtualizer as useTanStackVirtualizer } from "@tanstack/react-virtual";
 import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types";
+
+// Use useLayoutEffect on client, useEffect on server (SSR safety)
+const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
 type UseVirtualizerParams<T> = {
   items: readonly T[];
@@ -27,15 +30,17 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
   const count = items.length;
 
   // Auto-detect viewport size when estimatedSize is not provided
-  const [measuredSize, setMeasuredSize] = useState<number>(() => {
+  // Use state with a "generation" counter to force re-render when element is measured
+  const [sizeState, setSizeState] = useState<{ size: number; measured: boolean }>(() => {
     // Initial fallback: use window size if available, else 800
-    if (typeof window !== "undefined") {
-      return orientation === "vertical" ? window.innerHeight : window.innerWidth;
-    }
-    return 800;
+    const fallback = typeof window !== "undefined"
+      ? (orientation === "vertical" ? window.innerHeight : window.innerWidth)
+      : 800;
+    return { size: fallback, measured: false };
   });
 
-  useEffect(() => {
+  // Use useLayoutEffect to measure BEFORE paint - this fixes the black screen on initial load
+  useIsomorphicLayoutEffect(() => {
     const scrollElement = getScrollElement();
     if (!scrollElement) return;
 
@@ -44,19 +49,29 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
         ? scrollElement.clientHeight
         : scrollElement.clientWidth;
       if (size > 0) {
-        setMeasuredSize(size);
+        setSizeState(prev => {
+          // Only update if size changed or first measurement
+          if (prev.size !== size || !prev.measured) {
+            return { size, measured: true };
+          }
+          return prev;
+        });
       }
     };
 
-    // Measure immediately
+    // Measure immediately (synchronously before paint)
     updateSize();
 
     // Watch for resizes
     const resizeObserver = new ResizeObserver(updateSize);
     resizeObserver.observe(scrollElement);
 
-    return () => resizeObserver.disconnect();
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [getScrollElement, orientation]);
+
+  const measuredSize = sizeState.size;
 
   const getEstimatedSize = (i: number): number => {
     const explicitSize = virtual?.estimatedSize;
@@ -67,6 +82,17 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     return measuredSize;
   };
 
+  // Compute initialRect from window size for first render (before scroll element is available)
+  const initialRect = useMemo(() => {
+    if (typeof window === "undefined") {
+      return { width: 800, height: 800 };
+    }
+    return {
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  }, []);
+
   const rowVirtualizer = useTanStackVirtualizer({
     count,
     getScrollElement,
@@ -74,6 +100,9 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     overscan: virtual?.overscan ?? 5,
     horizontal: orientation === "horizontal",
     getItemKey: virtual?.getItemKey ? (index) => virtual.getItemKey!(items[index], index) : undefined,
+    // CRITICAL: Provide initialRect so virtualizer can calculate items on first render
+    // even when getScrollElement() returns null
+    initialRect,
   });
 
   return useMemo(() => ({

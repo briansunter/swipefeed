@@ -174,12 +174,22 @@ Key bits: render prop usage, global keyboard navigation, gesture swipe, mute but
 ## Scripts (root)
 
 - `bun run build` – bundle `src/` to `dist/` with sourcemaps.
+- `bun run docs:api` – generate markdown API docs in `docs/api`.
+- `bun run docs:site` – generate HTML TypeDoc site to `site/docs` (default theme).
+- `bun run example:build:site` – build the Vite example with `base=/example/`.
+- `bun run site:prepare` – rebuild docs+example into `site/` for GitHub Pages.
 - `bun run test` – Vitest (jsdom) unit suite.
 - `bun run test:browser` – Vitest browser runner (wheel/scroll integration).
 - `bun run test:coverage`, `bun run test:browser:coverage`, `bun run coverage:merge` – coverage reports/merge.
 - `bun run lint` / `bun run format` – Biome lint/format.
 - `bun run typecheck` – TypeScript.
 - `bun run storybook` / `bun run storybook:build` – Storybook dev/build.
+
+## GitHub Pages (docs + example)
+
+- Build locally: `bun run site:prepare` (produces `site/docs` for API HTML, `site/example` for the Vite demo).
+- Deploy via CI: push to `main` and the Pages workflow builds both sections and publishes `site/` to the `gh-pages` branch (docs at `/docs/`, example at `/example/`).
+- If you change the repo name or want a custom subpath, set `VITE_BASE=/example/` accordingly in the workflow or when running `example:build:site`.
 
 ## Notes & limitations
 

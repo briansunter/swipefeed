@@ -6,8 +6,6 @@
       "name": "@brian/tiktok-swipe",
       "dependencies": {
         "@tanstack/react-virtual": "^3.13.12",
-        "@tanstack/virtual-core": "^3.0.0",
-        "@testing-library/jest-dom": "^6.9.1",
       },
       "devDependencies": {
         "@biomejs/biome": "^1.8.0",
@@ -16,6 +14,7 @@
         "@storybook/addon-interactions": "^8.3.6",
         "@storybook/react-vite": "^8.3.6",
         "@storybook/test": "^8.3.6",
+        "@testing-library/jest-dom": "^6.9.1",
         "@testing-library/react": "^15.0.0",
         "@testing-library/user-event": "^14.6.1",
         "@types/bun": "latest",

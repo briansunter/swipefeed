@@ -1,14 +1,29 @@
 {
-  "name": "@brian/tiktok-swipe",
+  "name": "swipefeed",
   "version": "0.1.0",
   "private": false,
   "type": "module",
   "workspaces": [
     "example"
   ],
+  "files": [
+    "dist"
+  ],
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
     "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap",
     "docs:api": "typedoc",
+    "docs:site": "typedoc --options typedoc.site.json",
+    "example:build:site": "cd example && VITE_BASE=/example/ bun run build",
+    "site:prepare": "rm -rf site && bun run docs:site && bun run example:build:site && mkdir -p site/example && cp -r example/dist/* site/example/",
     "test": "vitest run --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:coverage": "vitest run --coverage --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:browser": "vitest run --config vitest.browser.config.ts",
@@ -26,11 +41,10 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
-    "@tanstack/react-virtual": "^3.13.12",
-    "@tanstack/virtual-core": "^3.0.0",
-    "@testing-library/jest-dom": "^6.9.1"
+    "@tanstack/react-virtual": "^3.13.12"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
     "@biomejs/biome": "^1.8.0",
     "@playwright/test": "^1.57.0",
     "@storybook/addon-essentials": "^8.3.6",

@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import React, { useState, useEffect, useRef } from "react";
-import { SwipeDeck } from "../src";
+import { SwipeDeck, useWindowSize } from "../src";
 import "./index.css";
 
 // --- Icons ---
@@ -79,7 +79,7 @@ const NavButton = ({ outlineIcon, filledIcon, label, isActive }: { outlineIcon: 
 const MuteButton = ({ isMuted, toggleMute }: { isMuted: boolean; toggleMute: () => void }) => (
   <button
     onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-    className="fixed left-4 top-4 z-[9999] w-8 h-8 bg-black/35 rounded-full backdrop-blur-sm border border-white/20 flex items-center justify-center cursor-pointer pointer-events-auto"
+    className="absolute left-4 top-4 z-[9999] w-8 h-8 bg-black/35 rounded-full backdrop-blur-sm border border-white/20 flex items-center justify-center cursor-pointer pointer-events-auto"
   >
     <img src={isMuted ? VolumeOffIcon : VolumeUpIcon} alt={isMuted ? "Unmute" : "Mute"} className="w-[18px] h-[18px]" />
   </button>
@@ -125,35 +125,80 @@ const BottomNav = () => (
 
 const YouTubePlayer = ({ youtubeId, isActive, isMuted }: { youtubeId: string; isActive: boolean; isMuted: boolean }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [isReady, setIsReady] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [isVideoReady, setIsVideoReady] = useState(false);
 
+  // Listen for YouTube API ready messages
   useEffect(() => {
-    if (!iframeRef.current || !isReady) return;
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== "https://www.youtube.com") return;
+      try {
+        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        // YouTube API sends "onReady" or state changes when video is ready
+        if (data.event === "onReady" || data.event === "onStateChange") {
+          setIsVideoReady(true);
+        }
+        // Also handle info delivery which indicates the player is initialized
+        if (data.event === "infoDelivery" && data.info) {
+          setIsVideoReady(true);
+        }
+      } catch {
+        // Ignore non-JSON messages
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  // Fallback: if iframe loads but no API message received, show after timeout
+  useEffect(() => {
+    if (!isLoaded) return;
+    const timeout = setTimeout(() => setIsVideoReady(true), 2000);
+    return () => clearTimeout(timeout);
+  }, [isLoaded]);
+
+  // Control playback
+  useEffect(() => {
+    if (!iframeRef.current || !isVideoReady) return;
     const action = isActive ? "playVideo" : "pauseVideo";
     iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: action, args: [] }), "*");
-  }, [isActive, isReady]);
+  }, [isActive, isVideoReady]);
 
+  // Control mute
   useEffect(() => {
-    if (!iframeRef.current || !isReady) return;
+    if (!iframeRef.current || !isVideoReady) return;
     const action = isMuted ? "mute" : "unMute";
     iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: action, args: [] }), "*");
-  }, [isMuted, isReady]);
+  }, [isMuted, isVideoReady]);
 
   return (
     <div className="youtube-player-wrapper w-full h-full relative overflow-hidden bg-black">
       <iframe
         ref={iframeRef}
-        src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1`}
-        className="w-full h-full object-cover transition-opacity duration-400 ease-in scale-125 origin-center pointer-events-none"
-        style={{ opacity: 1, transform: 'scale(1.25)' }}
+        src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`}
+        className={`w-full h-full object-cover transition-opacity duration-500 ease-in scale-125 origin-center pointer-events-none ${isVideoReady ? 'opacity-100' : 'opacity-0'}`}
         title="YouTube video player"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
-        onLoad={() => setIsReady(true)}
+        onLoad={() => setIsLoaded(true)}
       />
-      <div className={`absolute inset-0 bg-black transition-opacity duration-400 ease-out pointer-events-none z-1 ${isReady ? 'opacity-0' : 'opacity-100'}`}>
-        <img src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`} alt="Cover" className="w-full h-full object-cover opacity-80" />
+      {/* Thumbnail overlay - shows until video is ready */}
+      <div className={`absolute inset-0 bg-black transition-opacity duration-500 ease-out pointer-events-none ${isVideoReady ? 'opacity-0' : 'opacity-100'}`}>
+        <img
+          src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
+          alt="Cover"
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            // Fallback to hqdefault if maxresdefault doesn't exist
+            (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
+          }}
+        />
+        {/* Loading spinner */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+        </div>
       </div>
     </div>
   );
@@ -203,23 +248,28 @@ const VideoCard = ({ item, isActive, isMuted }: { item: VideoItem; isActive: boo
 
 function App() {
   const [isMuted, setIsMuted] = useState(true);
+  const { height } = useWindowSize();
 
   return (
-    <main className="w-full h-full relative text-white bg-black">
-      <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
-      <Header />
-      <div className="w-full h-full">
-        <SwipeDeck
-          items={items}
-          className="w-full h-full overflow-hidden relative scrollbar-none"
-          gesture={{ ignoreWhileAnimating: false }}
-          keyboard={{ global: true }}
-        >
-          {({ item, isActive }) => <VideoCard item={item} isActive={isActive} isMuted={isMuted} />}
-        </SwipeDeck>
-      </div>
-      <BottomNav />
-    </main>
+    <div className="w-full h-full bg-black flex justify-center">
+      {/* Constrain to mobile-like width on desktop */}
+      <main className="w-full max-w-[430px] h-full relative text-white bg-black">
+        <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
+        <Header />
+        <div className="w-full h-full">
+          <SwipeDeck
+            items={items}
+            className="w-full h-full overflow-hidden relative scrollbar-none"
+            gesture={{ ignoreWhileAnimating: false }}
+            keyboard={{ global: true }}
+            virtual={{ estimatedSize: height || 800 }}
+          >
+            {({ item, isActive }) => <VideoCard item={item} isActive={isActive} isMuted={isMuted} />}
+          </SwipeDeck>
+        </div>
+        <BottomNav />
+      </main>
+    </div>
   );
 }
 
