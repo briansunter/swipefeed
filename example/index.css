@@ -24,8 +24,7 @@
     }
   }
 
-  --font-sans: 'Proxima Nova',
-  -apple-system,
+  --font-sans: -apple-system,
   BlinkMacSystemFont,
   "Segoe UI",
   Roboto,

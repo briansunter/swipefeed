@@ -3,15 +3,21 @@ import React, { useState, useEffect, useRef } from "react";
 import { SwipeDeck, useWindowSize } from "../src";
 import "./index.css";
 
+// --- Icons ---
+import HomeOutline from "./icons/home-outline.svg";
+import HomeFilled from "./icons/home-filled.svg";
+import FriendsOutline from "./icons/friends-outline.svg";
+import FriendsFilled from "./icons/friends-filled.svg";
+import InboxOutline from "./icons/inbox-outline.svg";
+import ProfileOutline from "./icons/profile-outline.svg";
+import ProfileFilled from "./icons/profile-filled.svg";
+import PlusIcon from "./icons/plus.svg";
+
 import HeartIcon from "./icons/heart.svg";
 import CommentIcon from "./icons/comment.svg";
 import BookmarkIcon from "./icons/bookmark.svg";
 import ShareIcon from "./icons/share.svg";
 import MusicIcon from "./icons/music.svg";
-import HomeIcon from "./icons/home.svg";
-import FriendsIcon from "./icons/friends.svg";
-import InboxIcon from "./icons/inbox.svg";
-import ProfileIcon from "./icons/profile.svg";
 import VolumeOffIcon from "./icons/volume-off.svg";
 import VolumeUpIcon from "./icons/volume-up.svg";
 
@@ -56,16 +62,16 @@ const items: VideoItem[] = Array.from({ length: 20 }, (_, i) => {
 
 const ActionButton = ({ icon, label, onClick }: { icon: string; label: string; onClick?: () => void }) => (
   <button className="flex flex-col items-center bg-transparent border-none cursor-pointer p-0 mb-3.5 transition-opacity duration-200 active:opacity-70 active:scale-95" onClick={onClick}>
-    <div className="w-10 h-10 flex items-center justify-center mb-0.5">
-      <img src={icon} alt={label} className="w-full h-full object-contain" />
+    <div className="w-10 h-10 flex items-center justify-center mb-0.5 drop-shadow-md filter shadow-black">
+      <img src={icon} alt={label} className="w-[34px] h-[34px] object-contain drop-shadow-md" />
     </div>
     <span className="text-white text-[11px] font-semibold drop-shadow-md tracking-wide text-center">{label}</span>
   </button>
 );
 
-const NavButton = ({ icon, label, isActive }: { icon: string; label: string; isActive?: boolean }) => (
-  <button className={`flex flex-col items-center justify-center bg-transparent border-none cursor-pointer gap-[3px] w-[20%] ${isActive ? 'text-white' : 'text-[#999]'}`}>
-    <img src={icon} alt={label} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-50'}`} />
+const NavButton = ({ outlineIcon, filledIcon, label, isActive }: { outlineIcon: string; filledIcon: string; label: string; isActive?: boolean }) => (
+  <button className={`flex flex-col items-center justify-center bg-transparent border-none cursor-pointer gap-[4px] w-[20%] ${isActive ? 'text-white' : 'text-[#999]'}`}>
+    <img src={isActive ? filledIcon : outlineIcon} alt={label} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-50'}`} />
     <span className="text-[10px] font-semibold tracking-wide">{label}</span>
   </button>
 );
@@ -93,15 +99,25 @@ const Header = () => (
 
 const BottomNav = () => (
   <nav className="absolute h-[54px] bottom-0 w-full bg-black border-t border-white/15 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,20px)]">
-    <NavButton icon={HomeIcon} label="Home" isActive />
-    <NavButton icon={FriendsIcon} label="Friends" />
+    <NavButton outlineIcon={HomeOutline} filledIcon={HomeFilled} label="Home" isActive />
+    <NavButton outlineIcon={FriendsOutline} filledIcon={FriendsFilled} label="Friends" />
     <div className="flex items-center justify-center w-[20%]">
-      <button className="w-[44px] h-[30px] relative bg-white rounded-lg flex items-center justify-center transition-transform active:scale-90 before:absolute before:-left-1 before:w-[44px] before:h-[30px] before:bg-[#25F4EE] before:rounded-lg before:-z-10 after:absolute after:-right-1 after:w-[44px] after:h-[30px] after:bg-[#FE2C55] after:rounded-lg after:-z-20">
-        <span className="text-[#121212] text-[20px] font-extrabold leading-none mt-px">+</span>
+      <button className="w-[45px] h-[30px] relative flex items-center justify-center active:scale-90 transition-transform cursor-pointer">
+        <div className="absolute left-0 top-[1px] w-[38px] h-[28px] bg-[#25F4EE] rounded-[8px] transform translate-x-[-3px]"></div>
+        <div className="absolute right-0 top-[1px] w-[38px] h-[28px] bg-[#FE2C55] rounded-[8px] transform translate-x-[3px]"></div>
+        <div className="absolute left-[3.5px] top-[1px] w-[38px] h-[28px] bg-white rounded-[8px] z-10 flex items-center justify-center">
+          <img src={PlusIcon} alt="Create" className="w-[22px] h-[22px]" />
+        </div>
       </button>
     </div>
-    <NavButton icon={InboxIcon} label="Inbox" />
-    <NavButton icon={ProfileIcon} label="Profile" />
+    <div className="w-[20%] flex flex-col items-center justify-center cursor-pointer gap-[4px] text-[#999]">
+      <div className="relative">
+        <img src={InboxOutline} alt="Inbox" className="w-8 h-8 opacity-50" />
+        <div className="absolute -top-0.5 -right-0.5 bg-[#FE2C55] text-white text-[10px] font-bold px-1 min-w-[16px] h-4 flex items-center justify-center rounded-full border border-black">5</div>
+      </div>
+      <span className="text-[10px] font-semibold tracking-wide">Inbox</span>
+    </div>
+    <NavButton outlineIcon={ProfileOutline} filledIcon={ProfileFilled} label="Profile" />
   </nav>
 );
 

@@ -158,6 +158,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     debounce: wheelCfg.debounce ?? 120,
     cooldown: wheelCfg.cooldown ?? 400,
     onRequestIndexChange: delta => navigateTo(index + delta, "user:wheel"),
+    viewportRef,
   });
 
   const gestures = useGestures({
@@ -319,13 +320,13 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       "aria-busy": isAnimating,
       tabIndex: 0,
       onScroll: handleScroll,
-      onWheel: wheel.onWheel,
+      // onWheel: wheel.onWheel, // REMOVED: Managed internally by useWheel
       onKeyDown: keyboard.onKeyDown,
       onTouchStart: handleTouchStart,
       ...gestures.handlers,
       style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel, gestures.handlers]);
+  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, orientation, gestures.handlers]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {

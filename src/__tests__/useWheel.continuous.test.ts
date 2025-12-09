@@ -2,11 +2,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWheel } from "../hooks/useWheel";
+import { useRef } from "react";
 
 describe("useWheel continuous mode", () => {
   it("does not page when discretePaging=false", () => {
     const onRequestIndexChange = vi.fn();
-    const { result } = renderHook(() =>
+    const element = document.createElement("div");
+
+    renderHook(() => {
+      const viewportRef = useRef<HTMLElement | null>(element);
       useWheel({
         orientation: "vertical",
         direction: "ltr",
@@ -14,11 +18,17 @@ describe("useWheel continuous mode", () => {
         threshold: 10,
         debounce: 50,
         onRequestIndexChange,
-      }),
-    );
+        viewportRef,
+      });
+    });
 
-    result.current.onWheel(new WheelEvent("wheel", { deltaY: 50 }) as unknown as React.WheelEvent);
+    const event = new WheelEvent("wheel", { deltaY: 50 });
+    Object.defineProperty(event, 'preventDefault', { value: vi.fn(), writable: true });
+
+    element.dispatchEvent(event);
+
     expect(onRequestIndexChange).not.toHaveBeenCalled();
+    // Should NOT call preventDefault in continuous/native mode
+    expect(event.preventDefault).not.toHaveBeenCalled();
   });
 });
-

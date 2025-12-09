@@ -1,7 +1,7 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useRef, useEffect } from "react";
 import type { Direction, Orientation } from "../types";
 
-type UseWheelParams = {
+export type UseWheelParams = {
   orientation: Orientation;
   direction: Direction;
   discretePaging: boolean;
@@ -9,6 +9,7 @@ type UseWheelParams = {
   debounce: number;
   cooldown?: number; // Cooldown period after navigation (ms)
   onRequestIndexChange: (delta: 1 | -1) => void;
+  viewportRef: React.RefObject<HTMLElement | null>;
 };
 
 /**
@@ -28,7 +29,8 @@ export function useWheel(params: UseWheelParams) {
     threshold,
     debounce,
     cooldown = 800, // 800ms cooldown - reduced double triggers
-    onRequestIndexChange
+    onRequestIndexChange,
+    viewportRef
   } = params;
 
   const accumulated = useRef(0);
@@ -53,8 +55,11 @@ export function useWheel(params: UseWheelParams) {
     }, debounce);
   }, [debounce]);
 
-  const onWheel = useCallback(
-    (evt: React.WheelEvent) => {
+  useEffect(() => {
+    const element = viewportRef.current;
+    if (!element) return;
+
+    const onWheel = (evt: WheelEvent) => {
       if (!discretePaging) return; // allow native scroll; index derived elsewhere
 
       evt.preventDefault();
@@ -128,10 +133,24 @@ export function useWheel(params: UseWheelParams) {
 
         onRequestIndexChange(delta);
       }
-    },
-    [direction, discretePaging, onRequestIndexChange, orientation, threshold, resetAccumulated, cooldown],
-  );
+    };
 
-  return { onWheel };
+    // Passive: false is required to preventDefault
+    element.addEventListener("wheel", onWheel, { passive: false });
+
+    return () => {
+      element.removeEventListener("wheel", onWheel);
+    };
+  }, [
+    orientation,
+    direction,
+    discretePaging,
+    threshold,
+    debounce,
+    cooldown,
+    onRequestIndexChange,
+    resetAccumulated,
+    viewportRef // Dependency for ref attachment
+  ]);
 }
 
