@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useVirtualizer as useTanStackVirtualizer } from "@tanstack/react-virtual";
 import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types";
 
@@ -18,21 +19,57 @@ type VirtualizerResult = {
 
 /**
  * Simplified adapter using @tanstack/react-virtual
+ * Auto-detects viewport size when estimatedSize is not provided.
  */
 export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerResult {
   const { items, virtual, getScrollElement, orientation = "vertical" } = params;
   const count = items.length;
 
+  // Auto-detect viewport size when estimatedSize is not provided
+  const [measuredSize, setMeasuredSize] = useState<number>(() => {
+    // Initial fallback: use window size if available, else 800
+    if (typeof window !== "undefined") {
+      return orientation === "vertical" ? window.innerHeight : window.innerWidth;
+    }
+    return 800;
+  });
+
+  useEffect(() => {
+    const scrollElement = getScrollElement();
+    if (!scrollElement) return;
+
+    const updateSize = () => {
+      const size = orientation === "vertical"
+        ? scrollElement.clientHeight
+        : scrollElement.clientWidth;
+      if (size > 0) {
+        setMeasuredSize(size);
+      }
+    };
+
+    // Measure immediately
+    updateSize();
+
+    // Watch for resizes
+    const resizeObserver = new ResizeObserver(updateSize);
+    resizeObserver.observe(scrollElement);
+
+    return () => resizeObserver.disconnect();
+  }, [getScrollElement, orientation]);
+
+  const getEstimatedSize = (i: number): number => {
+    const explicitSize = virtual?.estimatedSize;
+    if (explicitSize !== undefined) {
+      return typeof explicitSize === 'function' ? explicitSize(items[i], i) : explicitSize;
+    }
+    // Fall back to measured viewport size
+    return measuredSize;
+  };
+
   const rowVirtualizer = useTanStackVirtualizer({
     count,
     getScrollElement,
-    estimateSize: (i) => {
-      const est = virtual?.estimatedSize ?? 800;
-      if (typeof est === 'function') {
-        return est(items[i], i);
-      }
-      return est;
-    },
+    estimateSize: getEstimatedSize,
     overscan: virtual?.overscan ?? 5,
     horizontal: orientation === "horizontal",
     getItemKey: virtual?.getItemKey ? (index) => virtual.getItemKey!(items[index], index) : undefined,

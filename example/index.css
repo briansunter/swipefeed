@@ -8,4 +8,27 @@
     Helvetica,
     Arial,
     sans-serif;
+
+  /* Marquee animation */
+  --animate-marquee: marquee 8s linear infinite;
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+/* Custom utility to hide scrollbars */
+@utility scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 }

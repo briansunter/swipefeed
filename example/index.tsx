@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import React, { useState, useEffect, useRef } from "react";
-import { SwipeDeck, useWindowSize } from "../src";
+import { SwipeDeck } from "../src";
 import "./index.css";
 
 // --- Icons ---
@@ -98,7 +98,7 @@ const Header = () => (
 );
 
 const BottomNav = () => (
-  <nav className="absolute h-[54px] bottom-0 w-full bg-black border-t border-white/15 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,20px)]">
+  <nav className="absolute h-[54px] bottom-0 w-full bg-black border-t border-white/15 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,20px)] px-8">
     <NavButton outlineIcon={HomeOutline} filledIcon={HomeFilled} label="Home" isActive />
     <NavButton outlineIcon={FriendsOutline} filledIcon={FriendsFilled} label="Friends" />
     <div className="flex items-center justify-center w-[20%]">
@@ -164,7 +164,7 @@ const VideoInfo = ({ item }: { item: VideoItem }) => (
     <div className="flex items-center gap-2.5 text-[13px]">
       <img src={MusicIcon} alt="Music" className="w-[15px] h-[15px]" />
       <div className="w-[150px] overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <span className="inline-block text-[13px] font-medium animate-[marquee_8s_linear_infinite] pl-2.5">{item.music}</span>
+        <span className="inline-block text-[13px] font-medium animate-marquee pl-2.5">{item.music}</span>
       </div>
     </div>
   </div>
@@ -201,28 +201,16 @@ const VideoCard = ({ item, isActive, isMuted }: { item: VideoItem; isActive: boo
 
 function App() {
   const [isMuted, setIsMuted] = useState(true);
-  const { height } = useWindowSize();
 
   return (
     <main className="w-full h-full relative text-white bg-black">
       <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
       <Header />
-      {/* Inject custom keyframes once. Alternatively, could be in a global CSS but user requested moving into TSX. */}
-      <style>{`
-        @keyframes marquee {
-          0% { transform: translateX(0); }
-          100% { transform: translateX(-100%); }
-        }
-      `}</style>
       <div className="w-full h-full">
         <SwipeDeck
           items={items}
-          className="w-full h-full overflow-hidden relative"
-          orientation="vertical"
-          loop={false}
-          virtual={{ estimatedSize: height || 800 }}
-          wheel={{ discretePaging: true }}
-          gesture={{ lockAxis: true, ignoreWhileAnimating: false, threshold: 10 }}
+          className="w-full h-full overflow-hidden relative scrollbar-none"
+          gesture={{ ignoreWhileAnimating: false }}
         >
           {({ item, isActive }) => <VideoCard item={item} isActive={isActive} isMuted={isMuted} />}
         </SwipeDeck>
