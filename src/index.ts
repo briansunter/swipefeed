@@ -18,7 +18,5 @@ export type {
   ScrollBehavior,
 } from "./types";
 
-// Testing helpers
-export { simulateSwipe } from "./testing/simulateSwipe";
-export { simulateWheel } from "./testing/simulateWheel";
+
 

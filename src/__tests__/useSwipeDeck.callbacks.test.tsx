@@ -8,7 +8,7 @@ describe("useSwipeDeck callbacks", () => {
         // Mocks for virtualizer
         Object.defineProperty(HTMLElement.prototype, 'clientHeight', { configurable: true, value: 800 });
         Object.defineProperty(HTMLElement.prototype, 'scrollHeight', { configurable: true, value: 2400 });
-        global.ResizeObserver = class ResizeObserver {
+        globalThis.ResizeObserver = class ResizeObserver {
             observe() { }
             unobserve() { }
             disconnect() { }

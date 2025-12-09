@@ -18,7 +18,7 @@ describe("useWheel", () => {
         threshold: 10,
         debounce: 50,
         onRequestIndexChange,
-        viewportRef,
+        viewport: viewportRef.current,
       });
     });
 

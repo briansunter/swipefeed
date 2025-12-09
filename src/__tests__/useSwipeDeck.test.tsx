@@ -12,7 +12,7 @@ describe("useSwipeDeck / <SwipeDeck>", () => {
     Object.defineProperty(HTMLElement.prototype, 'clientWidth', { configurable: true, value: 400 });
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 400 });
     // Mock ResizeObserver
-    global.ResizeObserver = class ResizeObserver {
+    globalThis.ResizeObserver = class ResizeObserver {
       observe() { }
       unobserve() { }
       disconnect() { }

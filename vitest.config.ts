@@ -8,8 +8,11 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./vitest.setup.ts"],
     coverage: {
-      provider: "v8",
-      reporter: ["text", "lcov"],
+      provider: "istanbul",
+      reporter: ["json", "text", "lcov"],
+      reportsDirectory: "./coverage/unit",
+      include: ["src/**"],
+      exclude: ["src/__tests__/**"],
       lines: 70,
       functions: 70,
       branches: 60,

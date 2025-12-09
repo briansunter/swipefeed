@@ -12,7 +12,7 @@ describe("SwipeDeck Gestures Integration", () => {
         Object.defineProperty(HTMLElement.prototype, 'offsetWidth', { configurable: true, value: 400 });
 
         // Mock ResizeObserver
-        global.ResizeObserver = class ResizeObserver {
+        globalThis.ResizeObserver = class ResizeObserver {
             observe() { }
             unobserve() { }
             disconnect() { }

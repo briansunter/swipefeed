@@ -32,7 +32,7 @@ describe("useWheel advanced logic", () => {
                 debounce: 100,
                 cooldown: 800,
                 onRequestIndexChange,
-                viewportRef,
+                viewport: viewportRef.current,
                 ...props
             });
             return { viewportRef };
