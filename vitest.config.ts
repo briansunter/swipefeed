@@ -12,11 +12,13 @@ export default defineConfig({
       reporter: ["json", "text", "lcov"],
       reportsDirectory: "./coverage/unit",
       include: ["src/**"],
-      exclude: ["src/__tests__/**"],
-      lines: 70,
-      functions: 70,
-      branches: 60,
-      statements: 70,
+      exclude: ["src/__tests__/**", "src/stories/**"],
+      thresholds: {
+        lines: 94,
+        functions: 88,
+        branches: 80,
+        statements: 92,
+      },
     },
   },
 });
