@@ -24,6 +24,7 @@
     "docs:site": "typedoc --options typedoc.site.json",
     "example:build:site": "cd example && VITE_BASE=/example/ bun run build",
     "site:prepare": "rm -rf site && bun run docs:site && bun run example:build:site && mkdir -p site/example && cp -r example/dist/* site/example/",
+    "site:publish": "bun run site:prepare && bunx gh-pages -d site -b gh-pages",
     "test": "vitest run --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:coverage": "vitest run --coverage --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:browser": "vitest run --config vitest.browser.config.ts",
