@@ -21,6 +21,7 @@ describe("SwipeDeck Gestures Integration", () => {
         // Mock pointer capture methods which are often missing in jsdom
         HTMLElement.prototype.setPointerCapture = vi.fn();
         HTMLElement.prototype.releasePointerCapture = vi.fn();
+        HTMLElement.prototype.scrollTo = vi.fn();
     });
 
     it("changes index on vertical swipe", async () => {
@@ -43,22 +44,28 @@ describe("SwipeDeck Gestures Integration", () => {
         // Drag UP (negative delta) moves to NEXT item.
 
         // Pointer Down
-        fireEvent.pointerDown(slidesContainer, {
-            buttons: 1,
-            clientY: 500,
-            pointerId: 1
+        act(() => {
+            fireEvent.pointerDown(slidesContainer, {
+                buttons: 1,
+                clientY: 500,
+                pointerId: 1
+            });
         });
 
         // Pointer Move (Swipe Up)
-        fireEvent.pointerMove(slidesContainer, {
-            buttons: 1,
-            clientY: 400, // Moved up 100px
-            pointerId: 1
+        act(() => {
+            fireEvent.pointerMove(slidesContainer, {
+                buttons: 1,
+                clientY: 400, // Moved up 100px
+                pointerId: 1
+            });
         });
 
         // Pointer Up
-        fireEvent.pointerUp(slidesContainer, {
-            pointerId: 1
+        act(() => {
+            fireEvent.pointerUp(slidesContainer, {
+                pointerId: 1
+            });
         });
 
         // Expect navigation to index 1

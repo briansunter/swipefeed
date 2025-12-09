@@ -20,5 +20,10 @@
     "include": [
         ".",
         "../src"
+    ],
+    "exclude": [
+        "../src/**/*.stories.tsx",
+        "../src/**/*.test.tsx",
+        "../src/**/__tests__/**"
     ]
 }
