@@ -104,6 +104,7 @@ export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
   virtualItems: SwipeDeckVirtualItem[];
   totalSize: number;
   items: readonly T[];
+  orientation: Orientation;
 }
 
 export interface SwipeDeckRenderContext<T> {

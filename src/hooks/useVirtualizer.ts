@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useVirtualizer as useTanStackVirtualizer } from "@tanstack/react-virtual";
 import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types";
 
@@ -76,7 +76,7 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     getItemKey: virtual?.getItemKey ? (index) => virtual.getItemKey!(items[index], index) : undefined,
   });
 
-  return {
+  return useMemo(() => ({
     virtualItems: rowVirtualizer.getVirtualItems().map(item => ({
       index: item.index,
       key: item.key as string | number,
@@ -100,5 +100,5 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
       });
     },
     containerSize: measuredSize,
-  };
+  }), [rowVirtualizer, measuredSize]);
 }

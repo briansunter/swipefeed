@@ -9,7 +9,7 @@ export type UseWheelParams = {
   debounce: number;
   cooldown?: number; // Cooldown period after navigation (ms)
   onRequestIndexChange: (delta: 1 | -1) => void;
-  viewportRef: React.RefObject<HTMLElement | null>;
+  viewport: HTMLElement | null;
 };
 
 /**
@@ -30,7 +30,7 @@ export function useWheel(params: UseWheelParams) {
     debounce,
     cooldown = 800, // 800ms cooldown - reduced double triggers
     onRequestIndexChange,
-    viewportRef
+    viewport
   } = params;
 
   const accumulated = useRef(0);
@@ -56,7 +56,7 @@ export function useWheel(params: UseWheelParams) {
   }, [debounce]);
 
   useEffect(() => {
-    const element = viewportRef.current;
+    const element = viewport;
     if (!element) return;
 
     const onWheel = (evt: WheelEvent) => {
@@ -150,7 +150,7 @@ export function useWheel(params: UseWheelParams) {
     cooldown,
     onRequestIndexChange,
     resetAccumulated,
-    viewportRef // Dependency for ref attachment
+    viewport // Dependency for ref attachment
   ]);
 }
 

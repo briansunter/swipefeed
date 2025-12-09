@@ -1,20 +1,17 @@
 import type { JSX } from "react";
-import React, { forwardRef, useImperativeHandle } from "react";
+import React, { useImperativeHandle, useMemo } from "react";
 import { useSwipeDeck } from "../hooks/useSwipeDeck";
 import type { SwipeDeckHandle, SwipeDeckProps } from "../types";
 
-type AsIntrinsic = keyof JSX.IntrinsicElements & string;
-type AsComponent = AsIntrinsic | React.ComponentType<unknown>;
-
-export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
-  props: SwipeDeckProps<T>,
-  ref: React.Ref<SwipeDeckHandle>,
+export function SwipeDeck<T>(
+  props: SwipeDeckProps<T> & { ref?: React.Ref<SwipeDeckHandle> },
 ) {
   const {
-    as: As = "div" as AsComponent,
+    as: As = "div",
     children,
     className,
     style,
+    ref,
     ...options
   } = props;
 
@@ -31,7 +28,6 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
         isAnimating: deck.isAnimating,
         canPrev: deck.canPrev,
         canNext: deck.canNext,
-
       }),
     }),
     [deck],
@@ -39,14 +35,40 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
 
   const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
 
+  const viewportStyle = useMemo(
+    () => ({ ...virtualStyle, ...style }),
+    [virtualStyle, style],
+  );
+
+  const contentStyle = useMemo<React.CSSProperties>(
+    () => ({
+      height: deck.orientation === "vertical" ? deck.totalSize : "100%",
+      width: deck.orientation === "horizontal" ? deck.totalSize : "100%",
+      position: "relative",
+    }),
+    [deck.orientation, deck.totalSize],
+  );
+
+  // Cast As to ElementType to avoid TS issues with polymorphic string/component
+  const Comp = As as React.ElementType;
+
   return (
-    <As {...(restViewportProps as any)} className={className} style={{ ...virtualStyle, ...style }}>
-      <div style={{ height: deck.totalSize, width: "100%", position: "relative" }}>
-        {deck.virtualItems.map(virtual => {
+    <Comp
+      {...restViewportProps}
+      className={className}
+      style={viewportStyle}
+    >
+      <div style={contentStyle}>
+        {deck.virtualItems.map((virtual) => {
           const item = deck.items[virtual.index];
           const itemProps = deck.getItemProps(virtual.index);
           return (
-            <div key={virtual.key} {...itemProps}>
+            <div
+              key={virtual.key}
+              {...itemProps}
+              role="article"
+              aria-label={`Item ${virtual.index + 1} of ${deck.items.length}`}
+            >
               {children({
                 item,
                 index: virtual.index,
@@ -57,9 +79,7 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
           );
         })}
       </div>
-    </As>
+    </Comp>
   );
-}) as <T>(
-  props: SwipeDeckProps<T> & { ref?: React.Ref<SwipeDeckHandle> },
-) => React.ReactElement;
+}
 

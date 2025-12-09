@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState, useMemo } from "react";
 import { clamp } from "../utils/clamp";
 import type { Direction, Orientation } from "../types";
 
@@ -156,9 +156,9 @@ export function useGestures(params: UseGesturesParams) {
     cancelDrag();
   }, [cancelDrag]);
 
-  return {
+  return useMemo(() => ({
     isDragging,
     handlers: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel },
-  };
+  }), [isDragging, onPointerDown, onPointerMove, onPointerUp, onPointerCancel]);
 }
 

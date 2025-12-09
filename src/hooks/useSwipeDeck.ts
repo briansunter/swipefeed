@@ -55,10 +55,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const loop = options.loop ?? DEFAULTS.loop;
   const defaultIndex = options.defaultIndex ?? DEFAULTS.defaultIndex;
 
-  const gestureCfg = { ...DEFAULTS.gesture, ...(options.gesture ?? {}) };
-  const wheelCfg = { ...DEFAULTS.wheel, ...(options.wheel ?? {}) };
-  const keyboardCfg = { ...DEFAULTS.keyboard, ...(options.keyboard ?? {}) };
-  const virtualCfg = { ...DEFAULTS.virtual, ...(options.virtual ?? {}) };
+  const gestureCfg = useMemo(() => ({ ...DEFAULTS.gesture, ...(options.gesture ?? {}) }), [options.gesture]);
+  const wheelCfg = useMemo(() => ({ ...DEFAULTS.wheel, ...(options.wheel ?? {}) }), [options.wheel]);
+  const keyboardCfg = useMemo(() => ({ ...DEFAULTS.keyboard, ...(options.keyboard ?? {}) }), [options.keyboard]);
+  const virtualCfg = useMemo(() => ({ ...DEFAULTS.virtual, ...(options.virtual ?? {}) }), [options.virtual]);
   const endReachedThreshold = options.endReachedThreshold ?? DEFAULTS.endReachedThreshold;
   const ariaLabel = options.ariaLabel ?? DEFAULTS.ariaLabel;
   const keyboardNavigation = options.keyboardNavigation ?? true;
@@ -68,7 +68,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const index = isControlled ? clamp(options.index ?? 0, 0, Math.max(items.length - 1, 0)) : internalIndex;
 
   const [isAnimating, setIsAnimating] = useState(false);
-  const viewportRef = useRef<HTMLElement | null>(null);
+
+  // Use state for viewport to ensure hooks like useVirtualizer/useWheel know when it's ready
+  const [viewport, setViewport] = useState<HTMLElement | null>(null);
+
   const sourceRef = useRef<IndexChangeSource>("snap");
   const dragStartScrollRef = useRef<number>(0);
   const isNavigatingRef = useRef(false); // Track programmatic navigation to prevent scroll handler interference
@@ -82,24 +85,55 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const virtualizer = useVirtualizer({
     items,
     virtual: virtualCfg,
-    getScrollElement: () => viewportRef.current,
+    getScrollElement: useCallback(() => viewport, [viewport]),
     orientation,
   });
 
+  // Stabilize callbacks using a ref for latest state
+  const latest = useRef({
+    index,
+    items,
+    isControlled,
+    options,
+    virtualizer,
+    loop,
+    orientation,
+    setInternalIndex,
+    setIsAnimating,
+    viewport, // Add viewport to latest ref
+  });
+
+  // Update ref on every render
+  latest.current = {
+    index,
+    items,
+    isControlled,
+    options,
+    virtualizer,
+    loop,
+    orientation,
+    setInternalIndex,
+    setIsAnimating,
+    viewport,
+  };
+
   const applyIndexChange = useCallback(
     (nextIndex: number) => {
+      const { index, isControlled, options, setInternalIndex, setIsAnimating } = latest.current;
       if (nextIndex === index) return;
       if (!isControlled) setInternalIndex(nextIndex);
       options.onIndexChange?.(nextIndex, sourceRef.current ?? "snap");
       setIsAnimating(false);
       sourceRef.current = "snap";
     },
-    [index, isControlled, options],
+    []
   );
 
 
   const navigateTo = useCallback(
     (targetIndex: number, source: IndexChangeSource, behavior?: ScrollBehavior) => {
+      const { items, loop, index, isControlled, options, orientation, virtualizer, setInternalIndex, viewport } = latest.current;
+
       if (items.length === 0) return;
       const maxIndex = items.length - 1;
       let next = targetIndex;
@@ -121,7 +155,6 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       if (!isControlled) setInternalIndex(next);
       options.onIndexChange?.(next, source);
 
-      const viewport = viewportRef.current;
       if (!viewport) return;
 
       // CRITICAL: Temporarily disable scroll-snap during programmatic navigation
@@ -152,7 +185,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         // (though virtualizer usually nails it)
       }, targetBehavior === 'smooth' ? 600 : 50);
     },
-    [index, isControlled, items.length, loop, options, orientation, virtualizer.scrollToIndex],
+    []
   );
 
   const wheel = useWheel({
@@ -162,9 +195,33 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     threshold: wheelCfg.threshold ?? 80,
     debounce: wheelCfg.debounce ?? 120,
     cooldown: wheelCfg.cooldown ?? 400,
-    onRequestIndexChange: delta => navigateTo(index + delta, "user:wheel"),
-    viewportRef,
+    onRequestIndexChange: delta => navigateTo(latest.current.index + delta, "user:wheel"),
+    viewport,
   });
+
+  const onDragStart = useCallback(() => {
+    const { viewport, orientation } = latest.current;
+    if (viewport) {
+      // Optimization: Force auto behavior immediately on drag start
+      viewport.style.scrollBehavior = 'auto';
+      dragStartScrollRef.current = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+    }
+  }, []);
+
+  const onDrag = useCallback((delta: number) => {
+    const { viewport, orientation } = latest.current;
+    if (viewport) {
+      const newScroll = dragStartScrollRef.current - delta;
+      if (orientation === "vertical") {
+        viewport.scrollTop = newScroll;
+      } else {
+        viewport.scrollLeft = newScroll;
+      }
+      // Force immediate scroll handling for smooth drag
+      // Note: setting scrollTop fires 'scroll' event asynchronously generally, but
+      // some browsers might fire it fast. We rely on the event listener.
+    }
+  }, []);
 
   const gestures = useGestures({
     orientation,
@@ -174,39 +231,21 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     lockAxis: gestureCfg.lockAxis ?? true,
     ignoreWhileAnimating: gestureCfg.ignoreWhileAnimating ?? true,
     loop,
-    getIndex: () => index,
+    getIndex: () => latest.current.index,
     maxIndex: Math.max(items.length - 1, 0),
     onRequestIndexChange: next => navigateTo(next, "user:gesture"),
     setAnimating: setIsAnimating,
     isAnimating,
-    onDragStart: () => {
-      if (viewportRef.current) {
-        // Optimization: Force auto behavior immediately on drag start
-        viewportRef.current.style.scrollBehavior = 'auto';
-        dragStartScrollRef.current = orientation === "vertical" ? viewportRef.current.scrollTop : viewportRef.current.scrollLeft;
-      }
-    },
-    onDrag: (delta) => {
-      if (viewportRef.current) {
-        const newScroll = dragStartScrollRef.current - delta;
-        if (orientation === "vertical") {
-          viewportRef.current.scrollTop = newScroll;
-        } else {
-          viewportRef.current.scrollLeft = newScroll;
-        }
-        // Force immediate scroll handling for smooth drag
-        // Note: setting scrollTop fires 'scroll' event asynchronously generally, but
-        // some browsers might fire it fast. We rely on the event listener.
-      }
-    }
+    onDragStart,
+    onDrag,
   });
 
   const keyboard = useKeyboard({
     orientation,
     direction,
     config: keyboardNavigation ? keyboardCfg : { enabled: false },
-    onPrev: () => navigateTo(index - 1, "user:keyboard"),
-    onNext: () => navigateTo(index + 1, "user:keyboard"),
+    onPrev: () => navigateTo(latest.current.index - 1, "user:keyboard"),
+    onNext: () => navigateTo(latest.current.index + 1, "user:keyboard"),
     onFirst: () => navigateTo(0, "user:keyboard"),
     onLast: () => navigateTo(items.length - 1, "user:keyboard"),
   });
@@ -232,8 +271,9 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Double-check we're not navigating
       if (isNavigatingRef.current) return;
 
-      const viewport = viewportRef.current;
+      const { viewport, orientation, virtualizer } = latest.current;
       if (!viewport) return;
+
       const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
       const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
 
@@ -250,17 +290,17 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         }
       }
     });
-  }, [orientation, virtualizer.virtualItems, applyIndexChange]);
+  }, [applyIndexChange]); // applyIndexChange is stable now
 
   useEffect(() => {
-    const viewport = viewportRef.current;
+    const viewport = latest.current.viewport;
     if (!viewport) return;
     // We attach scroll listener in virtualizer for ITs purposes.
     // But we also need one for updating SwipeDeck State (index).
     // And to support `wheel` which we attach to props.
     // Virtualizer attaches its own listener for rendering.
     // We validly can have multiple listeners.
-  }, []);
+  }, [viewport]); // Depend on viewport
 
   // onEndReached
   useEffect(() => {
@@ -299,11 +339,11 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   // Re-enable scroll-snap when user touches the screen
   const handleTouchStart = useCallback(() => {
-    const viewport = viewportRef.current;
+    const { viewport, orientation } = latest.current;
     if (viewport) {
       viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
     }
-  }, [orientation]);
+  }, []);
 
   const getViewportProps = useCallback(() => {
     const virtualStyles: React.CSSProperties = {
@@ -317,9 +357,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     };
 
     return {
-      ref: (el: HTMLElement | null) => {
-        viewportRef.current = el;
-      },
+      ref: setViewport,
       role: "feed",
       "aria-label": ariaLabel,
       "aria-busy": isAnimating,
@@ -335,6 +373,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   const getItemProps = useCallback(
     (itemIndex: number) => {
+      const { index, virtualizer, orientation } = latest.current;
       const virtual = virtualizer.virtualItems.find(v => v.index === itemIndex);
       const isActive = index === itemIndex;
 
@@ -359,20 +398,24 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         },
       };
     },
-    [index, virtualizer.virtualItems, orientation],
+    [],
   );
 
-  const api: SwipeDeckAPI<T> = {
+  const prev = useCallback(() => navigateTo(latest.current.index - 1, "user:keyboard"), [navigateTo]);
+  const next = useCallback(() => navigateTo(latest.current.index + 1, "user:keyboard"), [navigateTo]);
+
+  const api: SwipeDeckAPI<T> = useMemo(() => ({
     ...apiState,
-    prev: () => navigateTo(index - 1, "user:keyboard"),
-    next: () => navigateTo(index + 1, "user:keyboard"),
+    prev,
+    next,
     scrollTo: (target, opts) => navigateTo(target, "programmatic", opts?.behavior),
     getViewportProps,
     getItemProps,
     virtualItems: virtualizer.virtualItems,
     totalSize: virtualizer.totalSize,
     items,
-  };
+    orientation,
+  }), [apiState, prev, next, navigateTo, getViewportProps, getItemProps, virtualizer.virtualItems, virtualizer.totalSize, items, orientation]);
 
   return api;
 }
