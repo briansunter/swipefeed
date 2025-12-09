@@ -1,6 +1,6 @@
 /* Base Setup */
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: 'Proxima Nova', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -57,8 +57,20 @@ body,
   align-items: center;
 }
 
+.items-end {
+  align-items: flex-end;
+}
+
 .flex-col {
   flex-direction: column;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.pb-4 {
+  padding-bottom: 16px;
 }
 
 .pointer-events-none {
@@ -73,39 +85,6 @@ body,
   overflow: hidden;
 }
 
-/* NATIVE SCROLL FIX */
-.overflow-y-auto {
-  overflow-y: auto;
-}
-
-/* Scroll Snap */
-.snap-y-mandatory {
-  scroll-snap-type: y mandatory;
-}
-
-.snap-start {
-  scroll-snap-align: start;
-}
-
-.snap-always {
-  scroll-snap-stop: always;
-}
-
-/* Hide Scrollbar */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-/* Touch Action */
-.touch-pan-y {
-  touch-action: pan-y;
-}
-
 /* --- Components --- */
 
 /* Action Button */
@@ -117,33 +96,34 @@ body,
   border: none;
   cursor: pointer;
   padding: 0;
-  margin-bottom: 20px;
-  transition: transform 0.1s;
+  margin-bottom: 14px;
+  /* Tighter spacing */
+  transition: opacity 0.2s;
 }
 
 .action-button:active {
-  transform: scale(0.9);
+  opacity: 0.7;
+  transform: scale(0.95);
 }
 
 .action-icon-circle {
-  /* Removed circle background for standard actions to match TikTok's transparent look, 
-     but kept sizing for consistent hit target */
   width: 40px;
+  /* Matching SVG size */
   height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 4px;
-  /* Reduced margin */
-  /* text-shadow: 0 2px 4px rgba(0,0,0,0.3); */
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  margin-bottom: 2px;
+  /* Filter removed to avoid double shadow with SVG filter */
 }
 
 .action-label {
   color: white;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  letter-spacing: 0.3px;
+  text-align: center;
 }
 
 /* Video Overlay */
@@ -151,55 +131,91 @@ body,
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  padding-bottom: 80px;
-  /* Space for bottom nav */
+  justify-content: flex-end;
+  /* Ensure it sits above bottom nav */
+  padding-bottom: 54px;
 }
 
 .video-info {
-  padding-left: 16px;
-  padding-bottom: 20px;
-  width: 70%;
+  padding-left: 12px;
+  padding-bottom: 0px;
+  /* More space from bottom */
+  width: auto;
+  max-width: calc(100% - 70px);
+  /* Ensure it stops before the sidebar */
   text-align: left;
   z-index: 10;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
 }
 
 .info-username {
   font-weight: 700;
   font-size: 17px;
-  margin: 0 0 8px 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  margin: 0 0 4px 0;
 }
 
 .info-description {
   font-size: 15px;
-  margin: 0 0 10px 0;
+  margin: 0 0 6px 0;
   line-height: 1.3;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  font-weight: 400;
 }
 
 .info-music-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  gap: 10px;
+  font-size: 13px;
 }
 
+/* Music Marquee */
+.music-marquee-container {
+  white-space: nowrap;
+  overflow: hidden;
+  width: 150px;
+  mask-image: linear-gradient(to right, transparent, black 10%, black 90%, transparent);
+}
+
+.music-marquee-text {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
+  animation: marquee 8s linear infinite;
+  padding-left: 10px;
+  /* Initial offset */
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+/* Sidebar */
 .sidebar-container {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding-right: 8px;
-  padding-bottom: 20px;
-  width: 60px;
+  padding-right: 12px;
+  /* Prevent cutoff */
+  width: 50px;
+  /* Tighter sidebar width */
   z-index: 10;
+  padding-bottom: 8px;
 }
 
 /* Avatar */
 .avatar-wrapper {
   position: relative;
-  margin-bottom: 24px;
+  margin-bottom: 26px;
+  /* Spacing after avatar */
 }
 
 .avatar-circle {
@@ -209,25 +225,25 @@ body,
   background: #eee;
   border: 1px solid white;
   background-image: url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix');
-  /* Placeholder */
   background-size: cover;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 
 .avatar-plus {
   position: absolute;
-  bottom: -9px;
+  bottom: -11px;
   left: 50%;
   transform: translateX(-50%);
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   background: #fe2c55;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 18px;
-  border: 2px solid white;
+  font-size: 14px;
+  font-weight: bold;
 }
 
 /* Disc */
@@ -235,23 +251,26 @@ body,
   width: 48px;
   height: 48px;
   background: #222;
-  /* Dark vinyl look */
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 8px solid #111;
-  animation: spin 5s linear infinite;
+  border: 9px solid #161616;
+  background-image: linear-gradient(#111, #333);
+  animation: spin 6s linear infinite;
   margin-top: 10px;
+  /* Reduced top margin for disc */
+  margin-bottom: 0px;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
 }
 
 .disc-spin::after {
   content: '';
   position: absolute;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   background-image: url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix');
   background-size: cover;
   border-radius: 50%;
@@ -267,46 +286,41 @@ body,
   }
 }
 
-/* Modal */
-/* Removed modal styles as we switched to top nav toggles */
-
 /* Navigation */
 .top-nav {
-  padding-top: 50px;
+  padding-top: 10px;
   /* Safe area */
   z-index: 50;
-  /* background: linear-gradient(to bottom, rgba(0,0,0,0.3), transparent); */
+  pointer-events: none;
+  /* Let clicks pass through except links */
 }
 
 .nav-links {
+  pointer-events: auto;
   display: flex;
-  gap: 16px;
-  align-items: center;
-  font-size: 17px;
-  font-weight: 600;
+  align-items: baseline;
   color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .nav-link-active {
   opacity: 1;
-  border-bottom: 2px solid white;
-  padding-bottom: 4px;
+  border-bottom: 3px solid white;
+  padding-bottom: 6px;
+  margin-bottom: -6px;
+  /* Offset border */
 }
 
 .bottom-nav {
-  /* Using fixed height matching iOS standards approx 83px inc home bar */
-  height: 60px;
+  height: 54px;
+  /* Standard TikTok height */
   bottom: 0;
   background: black;
-  /* Solid black or very dark gradient for contrast */
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   justify-content: space-around;
   align-items: center;
   z-index: 50;
-  padding-bottom: 5px;
-  /* Home indicator space */
+  padding-bottom: env(safe-area-inset-bottom, 20px);
 }
 
 .nav-item {
@@ -316,29 +330,32 @@ body,
   justify-content: center;
   background: none;
   border: none;
-  color: #888;
+  color: #999;
   cursor: pointer;
-  gap: 4px;
+  gap: 3px;
+  width: 20%;
 }
 
 .nav-item.active {
   color: white;
 }
 
-.nav-icon {
-  width: 28px;
-  height: 28px;
-  /* SVGs will be styled inline */
-}
-
 .nav-label {
   font-size: 10px;
   font-weight: 600;
+  letter-spacing: 0.2px;
 }
 
 /* Upload Button Custom */
+.upload-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20%;
+}
+
 .upload-btn {
-  width: 45px;
+  width: 44px;
   height: 30px;
   position: relative;
   background: white;
@@ -347,16 +364,21 @@ body,
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: transform 0.1s ease;
+}
+
+.upload-btn:active {
+  transform: scale(0.9);
 }
 
 .upload-btn::before {
   content: '';
   position: absolute;
   left: -4px;
-  width: 45px;
+  width: 44px;
   height: 30px;
-  background: #65D2E9;
-  /* Cyan */
+  background: #25F4EE;
+  /* TikTok Cyan */
   border-radius: 8px;
   z-index: -1;
 }
@@ -365,17 +387,18 @@ body,
   content: '';
   position: absolute;
   right: -4px;
-  width: 45px;
+  width: 44px;
   height: 30px;
-  background: #E5436D;
-  /* Red */
+  background: #FE2C55;
+  /* TikTok Red */
   border-radius: 8px;
   z-index: -2;
 }
 
 .upload-plus {
-  color: black;
+  color: #121212;
   font-size: 20px;
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1;
+  margin-top: 1px;
 }

@@ -46,25 +46,28 @@ const DATA_SET = generateVideos(20);
 
 // --- Icons (Inline SVGs) ---
 const HeartIcon = () => (
-  <svg width="36" height="36" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
+  <svg width="40" height="40" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.3))">
     <path d="M24 41.95L21.05 39.2C10.55 29.7 3.65 23.45 3.65 15.75C3.65 9.45 8.6 4.45 14.9 4.45C18.45 4.45 21.85 6.1 24 8.6C26.15 6.1 29.55 4.45 33.1 4.45C39.4 4.45 44.35 9.45 44.35 15.75C44.35 23.45 37.45 29.7 26.95 39.2L24 41.95Z" fill="#fff" />
   </svg>
 );
 
 const CommentIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
-    <path d="M40.6 12.15C40.6 7.9 36.95 4.45 32.5 4.45H15.5C11.05 4.45 7.4 7.9 7.4 12.15V32.95C7.4 35.05 9.15 36.75 11.3 36.75H15.5V43.55L24.8 36.75H32.5C36.95 36.75 40.6 33.3 40.6 29.05V12.15Z" fill="#fff" />
+  <svg width="40" height="40" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.3))">
+    <path d="M40.6 12.15C40.6 7.9 36.95 4.45 32.5 4.45H15.5C11.05 4.45 7.4 7.9 7.4 12.15V32.95C7.4 35.05 9.15 36.75 11.3 36.75H15.5V43.55L24.8 36.75H32.5C36.95 36.75 40.6 33.3 40.6 29.05V12.15ZM13 18.5H35V21.5H13V18.5ZM13 24.5H28V27.5H13V24.5Z" fill="#fff" />
+    <circle cx="15" cy="20" r="2.5" fill="#161823" />
+    <circle cx="24" cy="20" r="2.5" fill="#161823" />
+    <circle cx="33" cy="20" r="2.5" fill="#161823" />
   </svg>
 );
 
 const BookmarkIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
+  <svg width="40" height="40" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.3))">
     <path d="M38 42L24 34L10 42V8C10 5.8 11.8 4 14 4H34C36.2 4 38 5.8 38 8V42Z" fill="#fff" />
   </svg>
 );
 
 const ShareIcon = () => (
-  <svg width="34" height="34" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 2px 4px rgba(0,0,0,0.5))">
+  <svg width="48" height="48" viewBox="0 0 48 48" fill="white" filter="drop-shadow(0px 1px 3px rgba(0,0,0,0.3))">
     <path d="M37.3 18.55V8.85L47.4 20.95L37.3 33.05V23.75C24.1 23.75 14.9 28 8.6 37.05C9.7 26.65 19.3 18.85 37.3 18.55Z" fill="#fff" />
   </svg>
 );
@@ -76,26 +79,34 @@ const MusicIcon = () => (
 );
 
 const HomeIcon = ({ active }: { active: boolean }) => (
-  <svg width="26" height="26" viewBox="0 0 48 48" fill={active ? "white" : "#888"}>
-    <path d="M24 4L6 18V42H18V28H30V42H42V18L24 4Z" fill="currentColor" />
+  <svg width="32" height="32" viewBox="0 0 48 48" fill={active ? "white" : "white"} style={{ opacity: active ? 1 : 0.5 }}>
+    <path d="M39.5 25.5V42H28.5V30H19.5V42H8.5V25.5L24 11.5L39.5 25.5Z" fill="currentColor" />
+    <path d="M24 6L6 22H9V43H18V31H30V43H39V22H42L24 6Z" fill={active ? "white" : "transparent"} stroke={active ? "none" : "white"} strokeWidth="4" />
   </svg>
 );
 
 const FriendsIcon = ({ active }: { active: boolean }) => (
-  <svg width="26" height="26" viewBox="0 0 48 48" fill={active ? "white" : "#888"}>
-    <path d="M32 24C36.4183 24 40 20.4183 40 16C40 11.5817 36.4183 8 32 8C27.5817 8 24 11.5817 24 16C24 20.4183 27.5817 24 32 24ZM16 28C20.4183 28 24 24.4183 24 20C24 15.5817 20.4183 12 16 12C11.5817 12 8 15.5817 8 20C8 24.4183 11.5817 28 16 28ZM8 34V38H24V34C24 31.79 22.21 30 20 30H12C9.79 30 8 31.79 8 34ZM28 30H36C38.21 30 40 31.79 40 34V38H48V34C48 30.69 45.31 28 42 28H32.6C30.6 28.5 29.1 29.8 28 30Z" fill="currentColor" />
+  <svg width="32" height="32" viewBox="0 0 48 48" fill={active ? "white" : "white"} style={{ opacity: active ? 1 : 0.5 }}>
+    <path d="M14 26C18.4183 26 22 22.4183 22 18C22 13.5817 18.4183 10 14 10C9.58172 10 6 13.5817 6 18C6 22.4183 9.58172 26 14 26Z" stroke="currentColor" strokeWidth="4" fill={active ? "currentColor" : "none"} />
+    <path d="M34 26C38.4183 26 42 22.4183 42 18C42 13.5817 38.4183 10 34 10C29.5817 10 26 13.5817 26 18C26 22.4183 29.5817 26 34 26Z" stroke="currentColor" strokeWidth="4" fill={active ? "currentColor" : "none"} />
+    <path d="M7 36C7 32.134 10.134 29 14 29H15" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <path d="M33 29H34C37.866 29 41 32.134 41 36" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <path d="M24 38C24 34.134 20.866 31 17 31H16" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
+    <path d="M32 31H31C27.134 31 24 34.134 24 38" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
   </svg>
 );
 
 const InboxIcon = ({ active }: { active: boolean }) => (
-  <svg width="26" height="26" viewBox="0 0 48 48" fill={active ? "white" : "#888"}>
-    <path d="M40 8H8C5.8 8 4 9.8 4 12V36C4 38.2 5.8 40 8 40H40C42.2 40 44 38.2 44 36V12C44 9.8 42.2 8 40 8ZM40 12V20H32C32 24.42 28.42 28 24 28C19.58 28 16 24.42 16 20H8V12H40Z" fill="currentColor" />
+  <svg width="32" height="32" viewBox="0 0 48 48" fill={active ? "white" : "white"} style={{ opacity: active ? 1 : 0.5 }}>
+    <path d="M9 14.5C9 11.4624 11.4624 9 14.5 9H33.5C36.5376 9 39 11.4624 39 14.5V31.5C39 34.5376 36.5376 37 33.5 37H24L17 41V37H14.5C11.4624 37 9 34.5376 9 31.5V14.5Z" stroke="currentColor" strokeWidth="4" fill={active ? "currentColor" : "none"} />
+    <path d="M17 23H31" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
   </svg>
 );
 
 const ProfileIcon = ({ active }: { active: boolean }) => (
-  <svg width="26" height="26" viewBox="0 0 48 48" fill={active ? "white" : "#888"}>
-    <path d="M24 24C29.5228 24 34 19.5228 34 14C34 8.47715 29.5228 4 24 4C18.4772 4 14 8.47715 14 14C14 19.5228 18.4772 24 24 24ZM24 28C17.3333 28 4 31.3333 4 38V44H44V38C44 31.3333 30.6667 28 24 28Z" fill="currentColor" />
+  <svg width="32" height="32" viewBox="0 0 48 48" fill={active ? "white" : "white"} style={{ opacity: active ? 1 : 0.5 }}>
+    <circle cx="24" cy="15" r="7" stroke="currentColor" strokeWidth="4" fill={active ? "currentColor" : "none"} />
+    <path d="M10.8706 36.562C12.3082 31.2599 17.7291 27 24 27C30.2709 27 35.6918 31.2599 37.1294 36.562C37.7562 38.8732 36.0076 41 33.6111 41H14.3889C11.9924 41 10.2438 38.8732 10.8706 36.562Z" stroke="currentColor" strokeWidth="4" fill={active ? "currentColor" : "none"} />
   </svg>
 );
 
@@ -110,10 +121,39 @@ const ActionButton = ({ icon, label, onClick }: { icon: React.ReactNode; label: 
   </button>
 );
 
-const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: boolean }) => {
+// --- Mute Button Component ---
+const MuteButton = ({ isMuted, toggleMute }: { isMuted: boolean; toggleMute: () => void }) => (
+  <button
+    onClick={(e) => { e.stopPropagation(); toggleMute(); }}
+    style={{
+      position: 'fixed',
+      left: '16px',
+      top: '16px',
+      zIndex: 9999,
+      width: '32px',
+      height: '32px',
+      background: 'rgba(0,0,0,0.35)',
+      borderRadius: '50%',
+      backdropFilter: 'blur(4px)',
+      border: '1px solid rgba(255,255,255,0.2)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      pointerEvents: 'auto'
+    }}
+  >
+    {isMuted ? (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>
+    ) : (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" /></svg>
+    )}
+  </button>
+);
+
+const YouTubePlayer = ({ youtubeId, isActive, isMuted }: { youtubeId: string; isActive: boolean; isMuted: boolean }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isReady, setIsReady] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
 
   // Sync Playback State
   useEffect(() => {
@@ -135,31 +175,19 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
     );
   }, [isMuted, isReady]);
 
-  const toggleMute = (e: React.MouseEvent | React.TouchEvent) => {
-    e.stopPropagation();
-    setIsMuted(!isMuted);
-  };
-
-  // Stable URL: Removed 'isActive' from dependency.
-  // CRITICAL: Set autoplay=1 to force player initialization and loading of the "Real" video frame.
-  // We rely on the useEffect(isActive) to immediately send 'pauseVideo' for off-screen items.
-  // This ensures the video is buffered/ready and showing video content, not just a thumbnail.
+  // Stable URL: set mute=1 initially to handle autoplay policies.
   const embedUrl = `https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1`;
   const thumbnailUrl = `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`;
 
   return (
     <div className="youtube-player-wrapper w-full h-full relative overflow-hidden bg-black">
-      {/* 
-         Scale 1.35x to push standard YouTube top-bar/title out of visible area.
-         Pointer-events: none ensures swipes go through to the SwipeDeck container.
-      */}
       <iframe
         ref={iframeRef}
         src={embedUrl}
         className="w-full h-full object-cover"
         style={{
           pointerEvents: 'none',
-          opacity: 1, // Always show iframe, just control playback
+          opacity: 1, // Always show iframe
           transition: 'opacity 0.4s ease-in',
           transform: 'scale(1.35)',
           transformOrigin: 'center center'
@@ -171,32 +199,6 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
         onLoad={() => setIsReady(true)}
       />
 
-      {/* Custom Volume Control - Integrated into side actions via absolute positioning matching sidebar */}
-      {isActive && (
-        <div className="absolute right-2 bottom-40 z-50 flex flex-col items-center" style={{ bottom: '380px', right: '8px' }}>
-          {/* Position roughly above the first sidebar item or integrated. 
-                 The Sidebar is in VideoOverlay. 
-                 To align perfectly, we'd ideally move this to VideoOverlay, but state is here.
-                 Visual approximation: Sidebar is bottom-aligned. 
-                 We'll place this nicely on the side.
-            */}
-          <button
-            onClick={toggleMute}
-            className="flex flex-col items-center justify-center mb-4"
-            style={{ pointerEvents: 'auto', width: '40px', height: '40px', background: 'rgba(0,0,0,0.4)', borderRadius: '50%' }}
-          >
-            {isMuted ? (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73 4.27 3zM12 4L9.91 6.09 12 8.18V4z" /></svg>
-            ) : (
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" /></svg>
-            )}
-          </button>
-          <span style={{ fontSize: '10px', textShadow: '0 1px 2px rgba(0,0,0,0.5)', marginTop: '-4px' }}>
-            {isMuted ? 'Unmute' : 'Mute'}
-          </span>
-        </div>
-      )}
-
       {/* Placeholder / Cover */}
       <div
         className="absolute inset-0 bg-black"
@@ -207,14 +209,12 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
           zIndex: 1
         }}
       >
-        {/* Only show thumb if not ready, to avoid flash */}
         <img
           src={thumbnailUrl}
           alt="Cover"
           className="w-full h-full object-cover opacity-80"
         />
       </div>
-
     </div>
   );
 };
@@ -222,21 +222,21 @@ const YouTubePlayer = ({ youtubeId, isActive }: { youtubeId: string; isActive: b
 const VideoOverlay = ({ item }: { item: VideoItem }) => {
   return (
     <div className="absolute inset-0 video-overlay-container pointer-events-none">
-      <div className="flex justify-between w-full pointer-events-auto" style={{ alignItems: 'flex-end' }}>
-        <div className="video-info">
+      <div className="flex justify-between w-full pointer-events-auto items-end pb-4">
+        <div className="video-info flex-1">
           <h3 className="info-username">{item.username}</h3>
           <p className="info-description">{item.description}</p>
           <div className="info-music-row">
             <MusicIcon />
-            <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', width: '150px' }}>
-              <span style={{ display: 'inline-block', fontSize: '14px', fontWeight: 500, animation: 'marquee 5s linear infinite' }}>
+            <div className="music-marquee-container">
+              <span className="music-marquee-text">
                 {item.music}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="sidebar-container" style={{ paddingBottom: '20px' }}>
+        <div className="sidebar-container">
           <div className="avatar-wrapper">
             <div className="avatar-circle"></div>
             <div className="avatar-plus">+</div>
@@ -252,7 +252,7 @@ const VideoOverlay = ({ item }: { item: VideoItem }) => {
   );
 };
 
-const VideoCard = ({ item, isActive }: { item: VideoItem; isActive: boolean }) => {
+const VideoCard = ({ item, isActive, isMuted }: { item: VideoItem; isActive: boolean; isMuted: boolean }) => {
   return (
     <div
       className="w-full h-full relative overflow-hidden"
@@ -260,8 +260,8 @@ const VideoCard = ({ item, isActive }: { item: VideoItem; isActive: boolean }) =
         background: `linear-gradient(180deg, ${item.color} 0%, #000 120%)`,
       }}
     >
-      <YouTubePlayer youtubeId={item.youtubeId} isActive={isActive} />
-      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.1) 0%, transparent 20%, transparent 80%, rgba(0,0,0,0.6) 100%)' }} />
+      <YouTubePlayer youtubeId={item.youtubeId} isActive={isActive} isMuted={isMuted} />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 20%, transparent 70%, rgba(0,0,0,0.8) 100%)' }} />
       <VideoOverlay item={item} />
     </div>
   );
@@ -269,10 +269,8 @@ const VideoCard = ({ item, isActive }: { item: VideoItem; isActive: boolean }) =
 
 // --- Feeds ---
 
-function SwipeFeed({ items }: { items: VideoItem[] }) {
+function SwipeFeed({ items, isMuted }: { items: VideoItem[]; isMuted: boolean }) {
   const { height } = useWindowSize();
-
-  // Fallback to avoid 0 height on initial render
   const itemHeight = height > 0 ? height : 800;
 
   return (
@@ -292,7 +290,7 @@ function SwipeFeed({ items }: { items: VideoItem[] }) {
       }}
     >
       {({ item, isActive }) => (
-        <VideoCard item={item} isActive={isActive} />
+        <VideoCard item={item} isActive={isActive} isMuted={isMuted} />
       )}
     </SwipeDeck>
   );
@@ -302,29 +300,30 @@ function SwipeFeed({ items }: { items: VideoItem[] }) {
 
 function App() {
   const items = DATA_SET;
+  const [isMuted, setIsMuted] = useState(true);
 
   return (
     <main className="w-full h-full relative" style={{ color: 'white', background: 'black' }}>
-      {/* Header */}
-      <header className="absolute top-nav w-full flex justify-between items-start px-4" style={{ top: '24px', paddingLeft: '16px', paddingRight: '16px', zIndex: 50 }}>
-        <div style={{ width: '40px' }}></div>
 
+      {/* Global Mute Button */}
+      <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
+
+      {/* Header */}
+      <header className="absolute top-nav w-full flex justify-center items-center" style={{ top: '0px', zIndex: 50 }}>
         <div className="nav-links flex items-center justify-center">
-          <span className="nav-link-active" style={{ fontSize: '18px', fontWeight: '700', textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+          <span className="nav-link" style={{ fontSize: '17px', fontWeight: '600', textShadow: '0 1px 2px rgba(0,0,0,0.5)', opacity: 0.7 }}>
             Following
           </span>
-          <span style={{ opacity: 0.2, margin: '0 8px' }}>|</span>
-          <span style={{ fontSize: '18px', fontWeight: '700', opacity: 0.6, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
+          <span style={{ opacity: 0.3, margin: '0 12px', fontSize: '14px' }}>|</span>
+          <span className="nav-link-active" style={{ fontSize: '18px', fontWeight: '700', textShadow: '0 1px 2px rgba(0,0,0,0.5)' }}>
             For You
           </span>
         </div>
-
-        <div style={{ width: '40px', display: 'flex', justifyContent: 'flex-end' }}></div>
       </header>
 
       {/* Content */}
       <div className="w-full h-full">
-        <SwipeFeed items={items} />
+        <SwipeFeed items={items} isMuted={isMuted} />
       </div>
 
       {/* Bottom Nav */}
