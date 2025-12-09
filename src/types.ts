@@ -22,6 +22,7 @@ export interface WheelConfig {
   discretePaging?: boolean;
   threshold?: number;
   debounce?: number;
+  cooldown?: number;
 }
 
 export interface KeyboardConfig {

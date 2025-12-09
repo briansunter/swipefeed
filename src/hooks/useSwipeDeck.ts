@@ -28,8 +28,9 @@ const DEFAULTS = {
   },
   wheel: {
     discretePaging: true,
-    threshold: 50,
-    debounce: 150,
+    threshold: 80,
+    debounce: 120,
+    cooldown: 400,
   },
   keyboard: {
     enabled: true,
@@ -70,6 +71,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const viewportRef = useRef<HTMLElement | null>(null);
   const sourceRef = useRef<IndexChangeSource>("snap");
   const dragStartScrollRef = useRef<number>(0);
+  const isNavigatingRef = useRef(false); // Track programmatic navigation to prevent scroll handler interference
 
   useEffect(() => {
     // Clamp index when items change
@@ -106,40 +108,55 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       } else {
         next = clamp(next, 0, maxIndex);
       }
+
+      // Don't navigate to same index
+      if (next === index) return;
+
       sourceRef.current = source;
 
+      // Mark as navigating to prevent handleScroll from interfering
+      isNavigatingRef.current = true;
+
+      // Update index immediately
+      if (!isControlled) setInternalIndex(next);
+      options.onIndexChange?.(next, source);
+
+      const viewport = viewportRef.current;
+      if (!viewport) return;
+
+      // CRITICAL: Temporarily disable scroll-snap during programmatic navigation
+      // This prevents CSS from fighting with our scroll position, while allowing
+      // use to use smooth scrolling
+      const originalSnapType = viewport.style.scrollSnapType;
+      viewport.style.scrollSnapType = 'none';
+      viewport.style.scrollBehavior = 'auto'; // Let virtualizer handle behavior
+
       const targetBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
+      const virtualizerBehavior = targetBehavior === 'instant' ? 'auto' : 'smooth';
 
-      // Optimization: trigger 'auto' scroll in JS, let CSS 'scroll-behavior: smooth' handle the animation
-      // This reduces JS main thread work and jitter.
-      // However, if we want 'instant', we rely on the fact that 'instant' usually overrides or we might need to handle it.
-      // For now, focusing on the "Native/Smooth" case.
+      // Use Virtualizer's scrollToIndex for perfect alignment with estimated/measured items
+      virtualizer.scrollToIndex(next, { behavior: virtualizerBehavior, align: 'start' });
 
-      // CRITICAL FIX: explicit style override to ensure smooth snap
-      // React state update for 'isDragging' is too slow (happens after this call).
-      // We must force the visual style to 'smooth' BEFORE calling scroll.
-      if (source === 'user:gesture' && targetBehavior === 'smooth' && viewportRef.current) {
-        viewportRef.current.style.scrollBehavior = 'smooth';
-      }
+      // Re-enable scroll-snap after animation completes to lock it in
+      // 600ms is usually enough for smooth scroll to finish
+      setTimeout(() => {
+        isNavigatingRef.current = false;
+        viewport.style.scrollSnapType = originalSnapType || (orientation === 'vertical' ? 'y mandatory' : 'x mandatory');
 
-      virtualizer.scrollToIndex(next, { behavior: 'auto', align: 'start' });
-
-      // We might need to manually trigger index change event if virtualizer doesn't invoke a callback that we can hook into.
-      // In virtualized mode with windowing, we rely on scroll position to determine active index usually.
-      // BUT if we are programmatically navigating, we want to update the index state.
-      if (targetBehavior === 'instant' || !isControlled) {
-        applyIndexChange(next);
-      }
+        // Ensure we are perfectly snapped if the animation didn't land exactly 
+        // (though virtualizer usually nails it)
+      }, targetBehavior === 'smooth' ? 600 : 50);
     },
-    [applyIndexChange, isControlled, items.length, loop, virtualizer.scrollToIndex],
+    [index, isControlled, items.length, loop, options, orientation, virtualizer.scrollToIndex],
   );
 
   const wheel = useWheel({
     orientation,
     direction,
     discretePaging: wheelCfg.discretePaging ?? true,
-    threshold: wheelCfg.threshold ?? 50,
-    debounce: wheelCfg.debounce ?? 150,
+    threshold: wheelCfg.threshold ?? 80,
+    debounce: wheelCfg.debounce ?? 120,
+    cooldown: wheelCfg.cooldown ?? 400,
     onRequestIndexChange: delta => navigateTo(index + delta, "user:wheel"),
   });
 
@@ -198,19 +215,22 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const rafId = useRef<number | null>(null);
 
   const handleScroll = useCallback(() => {
+    // Skip scroll-based index calculation during programmatic navigation
+    if (isNavigatingRef.current) return;
+
     if (rafId.current !== null) return;
 
     rafId.current = requestAnimationFrame(() => {
       rafId.current = null;
+
+      // Double-check we're not navigating
+      if (isNavigatingRef.current) return;
+
       const viewport = viewportRef.current;
       if (!viewport) return;
       const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
       const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
 
-      // Efficiently find active index without looping all
-      // We can use virtualizer.virtualItems from the closure, 
-      // but ideally we want fresh state if possible. 
-      // Luckily validation runs often.
       const visible = virtualizer.virtualItems;
       if (visible.length > 0) {
         // Find the one covering center
@@ -224,8 +244,6 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         }
       }
     });
-
-    // visibility.calculateFromPosition(scrollOffset, viewportSize); // DISABLE OLD LOOP
   }, [orientation, virtualizer.virtualItems, applyIndexChange]);
 
   useEffect(() => {
@@ -273,19 +291,23 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     [index, isAnimating, items.length, loop],
   );
 
+  // Re-enable scroll-snap when user touches the screen
+  const handleTouchStart = useCallback(() => {
+    const viewport = viewportRef.current;
+    if (viewport) {
+      viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
+    }
+  }, [orientation]);
+
   const getViewportProps = useCallback(() => {
-    // const isVertical = orientation === "vertical";
     const virtualStyles: React.CSSProperties = {
       position: "relative",
       overflow: "auto",
-      // Native Scroll Snap
+      // Native Scroll Snap - will be toggled by wheel/touch handlers
       scrollSnapType: orientation === "vertical" ? "y mandatory" : "x mandatory",
       // Ensure native scroll works
       touchAction: orientation === "vertical" ? "pan-y" : "pan-x",
-
-      // Remove manual scroll-behavior toggling, let snap handle it
-      // scrollBehavior: "smooth", 
-      willChange: "scroll-position", // Optimizes scrolling
+      willChange: "scroll-position",
     };
 
     return {
@@ -299,11 +321,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       onScroll: handleScroll,
       onWheel: wheel.onWheel,
       onKeyDown: keyboard.onKeyDown,
-      // Disable manual gesture handlers for drag to allow native scroll
-      // ...gestures.handlers, 
+      onTouchStart: handleTouchStart,
       style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, handleScroll, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel]);
+  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {

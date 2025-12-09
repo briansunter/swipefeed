@@ -12,7 +12,7 @@
     "lint": "biome lint .",
     "format": "biome format --write .",
     "typecheck": "tsc --noEmit",
-    "example:dev": "bun run --hot --watch example/index.html --host 0.0.0.0",
+    "example:dev": "vite example --host --port 3000",
     "example:build": "bun build example/index.ts --target=browser --outdir=dist-example --sourcemap",
     "storybook": "storybook dev -p 6006",
     "storybook:build": "storybook build"
