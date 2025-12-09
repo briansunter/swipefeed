@@ -63,16 +63,16 @@ const items: VideoItem[] = Array.from({ length: 20 }, (_, i) => {
 const ActionButton = ({ icon, label, onClick }: { icon: string; label: string; onClick?: () => void }) => (
   <button className="flex flex-col items-center bg-transparent border-none cursor-pointer p-0 mb-3.5 transition-opacity duration-200 active:opacity-70 active:scale-95" onClick={onClick}>
     <div className="w-10 h-10 flex items-center justify-center mb-0.5 drop-shadow-md filter shadow-black">
-      <img src={icon} alt={label} className="w-[34px] h-[34px] object-contain drop-shadow-md" />
+      <img src={icon} alt={label} className="w-[28px] h-[28px] object-contain drop-shadow-md" />
     </div>
     <span className="text-white text-[11px] font-semibold drop-shadow-md tracking-wide text-center">{label}</span>
   </button>
 );
 
 const NavButton = ({ outlineIcon, filledIcon, label, isActive }: { outlineIcon: string; filledIcon: string; label: string; isActive?: boolean }) => (
-  <button className={`flex flex-col items-center justify-center bg-transparent border-none cursor-pointer gap-[4px] w-[20%] ${isActive ? 'text-white' : 'text-[#999]'}`}>
-    <img src={isActive ? filledIcon : outlineIcon} alt={label} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-50'}`} />
-    <span className="text-[10px] font-semibold tracking-wide">{label}</span>
+  <button className={`flex-1 flex flex-col items-center justify-center bg-transparent border-none cursor-pointer gap-[3px] ${isActive ? 'text-white' : 'text-[#999]'}`}>
+    <img src={isActive ? filledIcon : outlineIcon} alt={label} className={`w-[26px] h-[26px] ${isActive ? 'opacity-100' : 'opacity-50'}`} />
+    <span className="text-[9px] font-semibold tracking-wide">{label}</span>
   </button>
 );
 
@@ -98,26 +98,28 @@ const Header = () => (
 );
 
 const BottomNav = () => (
-  <nav className="absolute h-[54px] bottom-0 w-full bg-black border-t border-white/15 flex justify-around items-center z-50 pb-[env(safe-area-inset-bottom,20px)] px-8">
-    <NavButton outlineIcon={HomeOutline} filledIcon={HomeFilled} label="Home" isActive />
-    <NavButton outlineIcon={FriendsOutline} filledIcon={FriendsFilled} label="Friends" />
-    <div className="flex items-center justify-center w-[20%]">
-      <button className="w-[45px] h-[30px] relative flex items-center justify-center active:scale-90 transition-transform cursor-pointer">
-        <div className="absolute left-0 top-[1px] w-[38px] h-[28px] bg-[#25F4EE] rounded-[8px] transform translate-x-[-3px]"></div>
-        <div className="absolute right-0 top-[1px] w-[38px] h-[28px] bg-[#FE2C55] rounded-[8px] transform translate-x-[3px]"></div>
-        <div className="absolute left-[3.5px] top-[1px] w-[38px] h-[28px] bg-white rounded-[8px] z-10 flex items-center justify-center">
-          <img src={PlusIcon} alt="Create" className="w-[22px] h-[22px]" />
-        </div>
-      </button>
-    </div>
-    <div className="w-[20%] flex flex-col items-center justify-center cursor-pointer gap-[4px] text-[#999]">
-      <div className="relative">
-        <img src={InboxOutline} alt="Inbox" className="w-8 h-8 opacity-50" />
-        <div className="absolute -top-0.5 -right-0.5 bg-[#FE2C55] text-white text-[10px] font-bold px-1 min-w-[16px] h-4 flex items-center justify-center rounded-full border border-black">5</div>
+  <nav className="absolute h-[48px] bottom-0 w-full z-50 pointer-events-none flex justify-center pb-[env(safe-area-inset-bottom,20px)] bg-black border-t border-white/15">
+    <div className="w-full max-w-[400px] pointer-events-auto flex justify-between items-center px-2 h-full">
+      <NavButton outlineIcon={HomeOutline} filledIcon={HomeFilled} label="Home" isActive />
+      <NavButton outlineIcon={FriendsOutline} filledIcon={FriendsFilled} label="Friends" />
+      <div className="flex items-center justify-center flex-1">
+        <button className="w-[38px] h-[26px] relative flex items-center justify-center active:scale-90 transition-transform cursor-pointer">
+          <div className="absolute left-0 top-[1px] w-[32px] h-[24px] bg-[#25F4EE] rounded-[6px] transform translate-x-[-2px]"></div>
+          <div className="absolute right-0 top-[1px] w-[32px] h-[24px] bg-[#FE2C55] rounded-[6px] transform translate-x-[2px]"></div>
+          <div className="absolute left-[3px] top-[1px] w-[32px] h-[24px] bg-white rounded-[6px] z-10 flex items-center justify-center">
+            <img src={PlusIcon} alt="Create" className="w-[18px] h-[18px]" />
+          </div>
+        </button>
       </div>
-      <span className="text-[10px] font-semibold tracking-wide">Inbox</span>
+      <div className="flex-1 flex flex-col items-center justify-center cursor-pointer gap-[3px] text-[#999]">
+        <div className="relative">
+          <img src={InboxOutline} alt="Inbox" className="w-[26px] h-[26px] opacity-50" />
+          <div className="absolute -top-0.5 -right-0.5 bg-[#FE2C55] text-white text-[9px] font-bold px-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full border border-black">5</div>
+        </div>
+        <span className="text-[9px] font-semibold tracking-wide">Inbox</span>
+      </div>
+      <NavButton outlineIcon={ProfileOutline} filledIcon={ProfileFilled} label="Profile" />
     </div>
-    <NavButton outlineIcon={ProfileOutline} filledIcon={ProfileFilled} label="Profile" />
   </nav>
 );
 
@@ -158,30 +160,30 @@ const YouTubePlayer = ({ youtubeId, isActive, isMuted }: { youtubeId: string; is
 };
 
 const VideoInfo = ({ item }: { item: VideoItem }) => (
-  <div className="flex-1 flex flex-col justify-end pl-3 pb-0 max-w-[calc(100%-70px)] z-10 text-left drop-shadow-md">
-    <h3 className="font-bold text-[17px] mb-1">{item.username}</h3>
-    <p className="text-[15px] mb-1.5 leading-[1.3] font-normal">{item.description}</p>
-    <div className="flex items-center gap-2.5 text-[13px]">
-      <img src={MusicIcon} alt="Music" className="w-[15px] h-[15px]" />
-      <div className="w-[150px] overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <span className="inline-block text-[13px] font-medium animate-marquee pl-2.5">{item.music}</span>
+  <div className="flex-1 flex flex-col justify-end pl-2 pb-1 max-w-[calc(100%-60px)] z-10 text-left drop-shadow-md">
+    <h3 className="font-bold text-[15px] mb-1">{item.username}</h3>
+    <p className="text-[13px] mb-1.5 leading-[1.2] font-normal opacity-90">{item.description}</p>
+    <div className="flex items-center gap-2 text-[12px]">
+      <img src={MusicIcon} alt="Music" className="w-[12px] h-[12px]" />
+      <div className="w-[140px] overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
+        <span className="inline-block text-[12px] font-medium animate-marquee pl-2">{item.music}</span>
       </div>
     </div>
   </div>
 );
 
 const VideoSidebar = ({ item }: { item: VideoItem }) => (
-  <div className="flex flex-col items-center pr-3 w-[50px] z-10 pb-2">
-    <div className="relative mb-[26px]">
-      <div className="w-12 h-12 rounded-full bg-gray-200 border border-white bg-cover shadow-md" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
-      <div className="absolute -bottom-[11px] left-1/2 -translate-x-1/2 w-6 h-6 bg-[#fe2c55] rounded-full flex items-center justify-center text-white text-[14px] font-bold">+</div>
+  <div className="flex flex-col items-center pr-2 w-[45px] z-10 pb-0">
+    <div className="relative mb-[20px]">
+      <div className="w-10 h-10 rounded-full bg-gray-200 border border-white bg-cover shadow-md" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
+      <div className="absolute -bottom-[9px] left-1/2 -translate-x-1/2 w-5 h-5 bg-[#fe2c55] rounded-full flex items-center justify-center text-white text-[12px] font-bold">+</div>
     </div>
     <ActionButton icon={HeartIcon} label={item.likes} />
     <ActionButton icon={CommentIcon} label={item.comments} />
     <ActionButton icon={BookmarkIcon} label="Favorites" />
     <ActionButton icon={ShareIcon} label={item.shares} />
-    <div className="w-12 h-12 bg-[#222] rounded-full flex items-center justify-center border-[9px] border-[#161616] bg-gradient-to-b from-[#111] to-[#333] animate-[spin_6s_linear_infinite] mt-2.5 mb-0 relative overflow-hidden shadow-md">
-      <div className="absolute w-[22px] h-[22px] bg-cover rounded-full" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
+    <div className="w-10 h-10 bg-[#222] rounded-full flex items-center justify-center border-[8px] border-[#161616] bg-gradient-to-b from-[#111] to-[#333] animate-[spin_6s_linear_infinite] mt-2 mb-0 relative overflow-hidden shadow-md">
+      <div className="absolute w-[18px] h-[18px] bg-cover rounded-full" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
     </div>
   </div>
 );
@@ -190,8 +192,8 @@ const VideoCard = ({ item, isActive, isMuted }: { item: VideoItem; isActive: boo
   <div className="w-full h-full relative overflow-hidden" style={{ background: `linear-gradient(180deg, ${item.color} 0%, #000 120%)` }}>
     <YouTubePlayer youtubeId={item.youtubeId} isActive={isActive} isMuted={isMuted} />
     <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 20%, transparent 70%, rgba(0,0,0,0.8) 100%)' }} />
-    <div className="absolute inset-0 flex flex-col justify-end pb-[54px] pointer-events-none">
-      <div className="flex justify-between w-full pointer-events-auto items-end pb-4">
+    <div className="absolute inset-0 flex flex-col justify-end pb-[48px] pointer-events-none">
+      <div className="flex justify-between w-full pointer-events-auto items-end pb-2">
         <VideoInfo item={item} />
         <VideoSidebar item={item} />
       </div>
@@ -211,6 +213,7 @@ function App() {
           items={items}
           className="w-full h-full overflow-hidden relative scrollbar-none"
           gesture={{ ignoreWhileAnimating: false }}
+          keyboard={{ global: true }}
         >
           {({ item, isActive }) => <VideoCard item={item} isActive={isActive} isMuted={isMuted} />}
         </SwipeDeck>

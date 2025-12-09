@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import type { Direction, KeyboardConfig, Orientation } from "../types";
 
 type UseKeyboardParams = {
@@ -36,10 +36,11 @@ export function useKeyboard(params: UseKeyboardParams) {
   const { orientation, direction, config, onPrev, onNext, onFirst, onLast } = params;
 
   const enabled = config?.enabled ?? true;
+  const isGlobal = config?.global ?? false;
   const bindings = config?.bindings ?? (orientation === "vertical" ? DEFAULT_BINDINGS_VERTICAL : DEFAULT_BINDINGS_HORIZONTAL);
 
   const handleKeyDown = useCallback(
-    (evt: React.KeyboardEvent) => {
+    (evt: KeyboardEvent | React.KeyboardEvent) => {
       if (!enabled) return;
 
       const key = evt.key;
@@ -78,6 +79,16 @@ export function useKeyboard(params: UseKeyboardParams) {
     },
     [bindings, direction, enabled, onFirst, onLast, onNext, onPrev, orientation],
   );
+
+  // Global listener support
+  useEffect(() => {
+    if (!enabled || !isGlobal) return;
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [enabled, isGlobal, handleKeyDown]);
 
   return { onKeyDown: handleKeyDown };
 }

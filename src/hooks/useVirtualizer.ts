@@ -15,6 +15,7 @@ type VirtualizerResult = {
   getItemOffset: (index: number) => number;
   getItemSize: (index: number) => number;
   scrollToIndex: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto', behavior?: 'auto' | 'smooth' }) => void;
+  containerSize: number;
 };
 
 /**
@@ -98,5 +99,6 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
         behavior: options?.behavior,
       });
     },
+    containerSize: measuredSize,
   };
 }

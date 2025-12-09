@@ -132,10 +132,15 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       viewport.style.scrollBehavior = 'auto'; // Let virtualizer handle behavior
 
       const targetBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
-      const virtualizerBehavior = targetBehavior === 'instant' ? 'auto' : 'smooth';
 
-      // Use Virtualizer's scrollToIndex for perfect alignment with estimated/measured items
-      virtualizer.scrollToIndex(next, { behavior: virtualizerBehavior, align: 'start' });
+      // Manual scroll calculation to bypass virtualizer's dynamic size check which warns on smooth scroll
+      const targetScroll = next * virtualizer.containerSize;
+
+      if (orientation === 'vertical') {
+        viewport.scrollTo({ top: targetScroll, behavior: targetBehavior });
+      } else {
+        viewport.scrollTo({ left: targetScroll, behavior: targetBehavior });
+      }
 
       // Re-enable scroll-snap after animation completes to lock it in
       // 600ms is usually enough for smooth scroll to finish

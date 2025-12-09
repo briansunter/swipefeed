@@ -27,6 +27,7 @@ export interface WheelConfig {
 
 export interface KeyboardConfig {
   enabled?: boolean;
+  global?: boolean;
   bindings?: {
     prev?: string[];
     next?: string[];
