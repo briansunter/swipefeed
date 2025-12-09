@@ -303,9 +303,9 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     const virtualStyles: React.CSSProperties = {
       position: "relative",
       overflow: "auto",
-      // Native Scroll Snap - will be toggled by wheel/touch handlers
+      // Native Scroll Snap - handles touch swipe automatically
       scrollSnapType: orientation === "vertical" ? "y mandatory" : "x mandatory",
-      // Ensure native scroll works
+      // Allow native touch scrolling - this works with scroll-snap for smooth swipe experience
       touchAction: orientation === "vertical" ? "pan-y" : "pan-x",
       willChange: "scroll-position",
     };
@@ -322,9 +322,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       onWheel: wheel.onWheel,
       onKeyDown: keyboard.onKeyDown,
       onTouchStart: handleTouchStart,
+      ...gestures.handlers,
       style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel]);
+  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, orientation, wheel.onWheel, gestures.handlers]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {

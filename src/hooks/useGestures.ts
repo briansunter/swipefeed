@@ -136,10 +136,10 @@ export function useGestures(params: UseGesturesParams) {
   }, []);
 
   const onPointerDown = useCallback((evt: React.PointerEvent) => {
-    if (ignoreWhileAnimating) return;
+    if (ignoreWhileAnimating && isAnimating) return;
     if (evt.button !== 0) return;
     startDrag(evt);
-  }, [ignoreWhileAnimating, startDrag]);
+  }, [ignoreWhileAnimating, isAnimating, startDrag]);
 
   const onPointerMove = useCallback((evt: React.PointerEvent) => {
     if (!lockAxis && !state.current.isDragging) return;

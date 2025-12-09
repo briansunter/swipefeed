@@ -37,10 +37,10 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
     [deck],
   );
 
-  const viewportProps = deck.getViewportProps();
+  const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
 
   return (
-    <As {...(viewportProps as any)} className={className} style={style}>
+    <As {...(restViewportProps as any)} className={className} style={{ ...virtualStyle, ...style }}>
       <div style={{ height: deck.totalSize, width: "100%", position: "relative" }}>
         {deck.virtualItems.map(virtual => {
           const item = deck.items[virtual.index];
