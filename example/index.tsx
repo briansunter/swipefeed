@@ -164,7 +164,7 @@ const VideoInfo = ({ item }: { item: VideoItem }) => (
     <div className="flex items-center gap-2.5 text-[13px]">
       <img src={MusicIcon} alt="Music" className="w-[15px] h-[15px]" />
       <div className="w-[150px] overflow-hidden whitespace-nowrap [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-        <span className="inline-block text-[13px] font-medium animate-marquee pl-2.5">{item.music}</span>
+        <span className="inline-block text-[13px] font-medium animate-[marquee_8s_linear_infinite] pl-2.5">{item.music}</span>
       </div>
     </div>
   </div>
@@ -180,7 +180,7 @@ const VideoSidebar = ({ item }: { item: VideoItem }) => (
     <ActionButton icon={CommentIcon} label={item.comments} />
     <ActionButton icon={BookmarkIcon} label="Favorites" />
     <ActionButton icon={ShareIcon} label={item.shares} />
-    <div className="w-12 h-12 bg-[#222] rounded-full flex items-center justify-center border-[9px] border-[#161616] bg-gradient-to-b from-[#111] to-[#333] animate-spin mt-2.5 mb-0 relative overflow-hidden shadow-md">
+    <div className="w-12 h-12 bg-[#222] rounded-full flex items-center justify-center border-[9px] border-[#161616] bg-gradient-to-b from-[#111] to-[#333] animate-[spin_6s_linear_infinite] mt-2.5 mb-0 relative overflow-hidden shadow-md">
       <div className="absolute w-[22px] h-[22px] bg-cover rounded-full" style={{ backgroundImage: "url('https://api.dicebear.com/9.x/avataaars/svg?seed=Felix')" }}></div>
     </div>
   </div>
@@ -207,6 +207,13 @@ function App() {
     <main className="w-full h-full relative text-white bg-black">
       <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
       <Header />
+      {/* Inject custom keyframes once. Alternatively, could be in a global CSS but user requested moving into TSX. */}
+      <style>{`
+        @keyframes marquee {
+          0% { transform: translateX(0); }
+          100% { transform: translateX(-100%); }
+        }
+      `}</style>
       <div className="w-full h-full">
         <SwipeDeck
           items={items}
