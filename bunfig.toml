@@ -1,0 +1,5 @@
+jsx = "react-jsx"
+
+[serve]
+hostname = "0.0.0.0"
+port = 3000

@@ -1,0 +1,56 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Dependency directories
+node_modules/
+
+# Bun artifacts
+bun.lockb
+
+# Build outputs
+dist/
+dist-example/
+storybook-static/
+coverage/
+site/
+*.tsbuildinfo
+*.tgz
+
+# Example app outputs
+example/node_modules/
+example/dist/
+example/.next/
+example/.turbo/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+bun-debug.log*
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Misc
+.turbo/
+.vercel/
+.cache/
+tmp/
+temp/
+
+example/index.js
+example/index.js.map
