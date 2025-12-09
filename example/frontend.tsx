@@ -1,6 +1,6 @@
 import { createRoot } from "react-dom/client";
 import React, { useMemo, useState, useEffect, useRef } from "react";
-import { SwipeDeck, useSwipeDeck } from "../src";
+import { SwipeDeck, useSwipeDeck, useWindowSize } from "../src";
 import "./index.css";
 
 // --- Types ---
@@ -98,24 +98,6 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
     <path d="M24 24C29.5228 24 34 19.5228 34 14C34 8.47715 29.5228 4 24 4C18.4772 4 14 8.47715 14 14C14 19.5228 18.4772 24 24 24ZM24 28C17.3333 28 4 31.3333 4 38V44H44V38C44 31.3333 30.6667 28 24 28Z" fill="currentColor" />
   </svg>
 );
-
-// --- Hooks ---
-function useWindowSize() {
-  const [size, setSize] = useState<{ width: number; height: number }>({
-    width: window.innerWidth,
-    height: window.innerHeight,
-  });
-
-  useEffect(() => {
-    const handleResize = () => {
-      setSize({ width: window.innerWidth, height: window.innerHeight });
-    };
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  return size;
-}
 
 // --- Components ---
 
@@ -293,58 +275,26 @@ function SwipeFeed({ items }: { items: VideoItem[] }) {
   // Fallback to avoid 0 height on initial render
   const itemHeight = height > 0 ? height : 800;
 
-  const deck = useSwipeDeck({
-    items,
-    orientation: "vertical",
-    loop: false,
-    virtual: {
-      estimatedSize: itemHeight,
-    },
-    // The user requested: "next video starts playing when it's dragged more than halfway"
-    // Our 'useSwipeDeck' already updates the 'index' when the center point of the item crosses the center of the viewport.
-    // This is essentially "dragged more than halfway".
-    // When 'index' updates, 'isActive' becomes true for the next video.
-    // So the layout logic in useSwipeDeck.ts:handleScroll matches this requirement.
-
-    wheel: { discretePaging: true },
-    gesture: {
-      lockAxis: true,
-      ignoreWhileAnimating: false,
-      // We might want to tune threshold to be easier?
-      threshold: 10,
-    },
-  });
-
-  const totalHeight = deck.totalSize;
-
   return (
-    <div
-      {...deck.getViewportProps()}
+    <SwipeDeck
+      items={items}
       className="w-full h-full overflow-hidden relative"
-      style={{ ...deck.getViewportProps().style }}
+      orientation="vertical"
+      loop={false}
+      virtual={{
+        estimatedSize: itemHeight,
+      }}
+      wheel={{ discretePaging: true }}
+      gesture={{
+        lockAxis: true,
+        ignoreWhileAnimating: false,
+        threshold: 10,
+      }}
     >
-      <div style={{ height: totalHeight, position: "relative", width: "100%" }}>
-        {deck.virtualItems.map((virtualItem) => {
-          const item = items[virtualItem.index];
-          return (
-            <div
-              key={virtualItem.key}
-              {...deck.getItemProps(virtualItem.index)}
-              className="absolute w-full"
-              style={{
-                ...deck.getItemProps(virtualItem.index).style,
-                left: 0,
-                top: 0,
-                transform: `translateY(${virtualItem.offset}px)`,
-                height: virtualItem.size,
-              }}
-            >
-              <VideoCard item={item} isActive={deck.index === virtualItem.index} />
-            </div>
-          )
-        })}
-      </div>
-    </div>
+      {({ item, isActive }) => (
+        <VideoCard item={item} isActive={isActive} />
+      )}
+    </SwipeDeck>
   );
 }
 

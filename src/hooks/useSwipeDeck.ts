@@ -28,9 +28,9 @@ const DEFAULTS = {
   },
   wheel: {
     discretePaging: true,
-    threshold: 80,
+    threshold: 100,
     debounce: 120,
-    cooldown: 400,
+    cooldown: 800,
   },
   keyboard: {
     enabled: true,

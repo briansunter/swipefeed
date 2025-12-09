@@ -1,4 +1,5 @@
 export { useSwipeDeck } from "./hooks/useSwipeDeck";
+export { useWindowSize } from "./hooks/useWindowSize";
 export { SwipeDeck } from "./components/SwipeDeck";
 
 export type {

@@ -41,19 +41,22 @@ export const SwipeDeck = forwardRef(function SwipeDeckInner<T>(
 
   return (
     <As {...(viewportProps as any)} className={className} style={style}>
-      {deck.virtualItems.map(virtual => {
-        const item = deck.items[virtual.index];
-        return (
-          <React.Fragment key={virtual.key}>
-            {children({
-              item,
-              index: virtual.index,
-              isActive: deck.index === virtual.index,
-              props: deck.getItemProps(virtual.index),
-            })}
-          </React.Fragment>
-        );
-      })}
+      <div style={{ height: deck.totalSize, width: "100%", position: "relative" }}>
+        {deck.virtualItems.map(virtual => {
+          const item = deck.items[virtual.index];
+          const itemProps = deck.getItemProps(virtual.index);
+          return (
+            <div key={virtual.key} {...itemProps}>
+              {children({
+                item,
+                index: virtual.index,
+                isActive: deck.index === virtual.index,
+                props: itemProps,
+              })}
+            </div>
+          );
+        })}
+      </div>
     </As>
   );
 }) as <T>(

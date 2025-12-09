@@ -27,7 +27,7 @@ export function useWheel(params: UseWheelParams) {
     discretePaging,
     threshold,
     debounce,
-    cooldown = 400, // 400ms cooldown - balance between responsiveness and protection
+    cooldown = 800, // 800ms cooldown - reduced double triggers
     onRequestIndexChange
   } = params;
 
