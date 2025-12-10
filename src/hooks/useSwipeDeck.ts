@@ -297,39 +297,18 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Double-check we're not navigating
       if (isNavigatingRef.current) return;
 
-      const { viewport, orientation, virtualizer, items } = latest.current;
+      const { viewport, orientation, items } = latest.current;
       if (!viewport) return;
 
       const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
       const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
 
-      const visible = virtualizer.virtualItems;
-      let matchIndex: number | null = null;
-
-      if (visible.length > 0) {
-        // Find the one covering center
-        const center = scrollOffset + viewportSize / 2;
-        const match = visible.find(v => {
-          const end = v.offset + v.size;
-          return v.offset <= center && end >= center;
-        });
-        if (match) {
-          matchIndex = match.index;
-        }
-      }
-
-      // Fallback: If no match found using virtual items (e.g. gaps, measuring issues, fast scroll),
-      // calculate index geometrically based on viewport size.
-      if (matchIndex === null && viewportSize > 0) {
-        const count = items.length;
-        if (count > 0) {
-          const estimatedIndex = Math.round(scrollOffset / viewportSize);
-          matchIndex = clamp(estimatedIndex, 0, count - 1);
-        }
-      }
-
-      if (matchIndex !== null) {
-        applyIndexChange(matchIndex);
+      // Simple geometric calculation - works with CSS viewport units
+      // Each item is 100dvh tall, so index = scrollOffset / viewportSize
+      if (viewportSize > 0 && items.length > 0) {
+        const estimatedIndex = Math.round(scrollOffset / viewportSize);
+        const newIndex = clamp(estimatedIndex, 0, items.length - 1);
+        applyIndexChange(newIndex);
       }
     });
   }, [applyIndexChange]); // applyIndexChange is stable now
@@ -369,6 +348,54 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     [index, isAnimating, items.length, loop],
   );
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RESIZE HANDLING: Scroll Position Correction
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CSS viewport units handle item sizing automatically.
+  // But scroll position (in pixels) becomes invalid on resize.
+  // We use the current index state to correct scroll position after resize settles.
+  const resizeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!viewport) return;
+
+    const handleResize = () => {
+      // Clear any pending correction
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+
+      // After resize settles, snap scroll to current index
+      resizeTimeoutRef.current = setTimeout(() => {
+        const { orientation, index: currentIndex } = latest.current;
+        if (!viewport) return;
+
+        const size = orientation === 'vertical' ? viewport.clientHeight : viewport.clientWidth;
+        const targetScroll = currentIndex * size;
+
+        // Only correct if significantly off (avoid fighting with scroll-snap)
+        const currentScroll = orientation === 'vertical' ? viewport.scrollTop : viewport.scrollLeft;
+        if (Math.abs(currentScroll - targetScroll) > size * 0.1) {
+          if (orientation === 'vertical') {
+            viewport.scrollTop = targetScroll;
+          } else {
+            viewport.scrollLeft = targetScroll;
+          }
+        }
+      }, 50);
+    };
+
+    const resizeObserver = new ResizeObserver(handleResize);
+    resizeObserver.observe(viewport);
+
+    return () => {
+      resizeObserver.disconnect();
+      if (resizeTimeoutRef.current) {
+        clearTimeout(resizeTimeoutRef.current);
+      }
+    };
+  }, [viewport]);
+
   // Re-enable scroll-snap when user touches the screen
   const handleTouchStart = useCallback(() => {
     const { viewport, orientation } = latest.current;
@@ -405,33 +432,34 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   const getItemProps = useCallback(
     (itemIndex: number) => {
-      const { index, virtualizer, orientation } = latest.current;
-      const virtual = virtualizer.virtualItems.find(v => v.index === itemIndex);
       const isActive = index === itemIndex;
 
+      // Use CSS viewport units for positioning - these automatically update on rotation!
+      // This is much simpler and more reliable than trying to correct pixel offsets.
+      const sizeUnit = orientation === 'vertical' ? '100dvh' : '100dvw';
+
       return {
-        ref: (virtual ? virtual.measureElement : undefined) as React.RefCallback<HTMLElement>,
+        ref: undefined,
         "data-index": itemIndex,
         "data-active": isActive,
         style: {
           position: "absolute" as const,
           top: 0,
           left: 0,
+          // Use CSS calc with viewport units - browser handles rotation automatically!
           transform: orientation === 'vertical'
-            ? `translateY(${virtual ? virtual.offset : 0}px)`
-            : `translateX(${virtual ? virtual.offset : 0}px)`,
-          height: orientation === 'vertical' ? (virtual ? virtual.size : undefined) : '100%',
-          width: orientation === 'horizontal' ? (virtual ? virtual.size : undefined) : '100%',
+            ? `translateY(calc(${itemIndex} * ${sizeUnit}))`
+            : `translateX(calc(${itemIndex} * ${sizeUnit}))`,
+          height: orientation === 'vertical' ? sizeUnit : '100%',
+          width: orientation === 'horizontal' ? sizeUnit : '100%',
           willChange: "transform",
-          contain: "layout paint",
           // Native Snap Item Styles
           scrollSnapAlign: "start",
           scrollSnapStop: "always" satisfies React.CSSProperties["scrollSnapStop"],
         } satisfies React.CSSProperties,
-
       };
     },
-    [],
+    [index, orientation],
   );
 
   const prev = useCallback(() => navigateTo(latest.current.index - 1, "user:keyboard"), [navigateTo]);
@@ -448,7 +476,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     totalSize: virtualizer.totalSize,
     items,
     orientation,
-  }), [apiState, prev, next, navigateTo, getViewportProps, getItemProps, virtualizer.virtualItems, virtualizer.totalSize, items, orientation]);
+    viewport,
+  }), [apiState, prev, next, navigateTo, getViewportProps, getItemProps, virtualizer.virtualItems, virtualizer.totalSize, items, orientation, viewport]);
 
   return api;
 }

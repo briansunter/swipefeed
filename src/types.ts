@@ -99,7 +99,7 @@ export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
     ref: React.RefCallback<HTMLElement>;
   };
   getItemProps: (index: number) => React.HTMLAttributes<HTMLElement> & {
-    ref: React.RefCallback<HTMLElement>;
+    ref?: React.RefCallback<HTMLElement>;
     "data-index": number;
     "data-active": boolean;
   };
@@ -107,6 +107,7 @@ export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
   totalSize: number;
   items: readonly T[];
   orientation: Orientation;
+  viewport: HTMLElement | null;
 }
 
 export interface SwipeDeckRenderContext<T> {
@@ -131,5 +132,6 @@ export interface SwipeDeckProps<T> extends SwipeDeckOptions<T> {
 
 export interface SwipeDeckHandle extends SwipeDeckActions {
   getState: () => SwipeDeckState;
+  viewport: HTMLElement | null;
 }
 
