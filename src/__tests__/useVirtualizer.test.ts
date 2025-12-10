@@ -220,4 +220,47 @@ describe("useVirtualizer", () => {
     expect(result.current.virtualItems).toBeDefined();
     expect(result.current.totalSize).toBe(200); // 2 items * 100 (from function)
   });
+  it("uses explicit estimatedSize when window and container sizes are 0", () => {
+    const originalInnerHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 0 });
+
+    const items = [{ id: 1 }];
+    const container = document.createElement("div");
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 0 });
+
+    const { result } = renderHook(() =>
+      useVirtualizer({
+        items,
+        virtual: { estimatedSize: 123 },
+        getScrollElement: () => container,
+      })
+    );
+
+    // Should use 123 because measurement is 0 and window is 0
+    expect(result.current.totalSize).toBe(123);
+
+    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: originalInnerHeight });
+  });
+
+  it("uses default 800 fallback when sizes are 0 and no estimatedSize provided", () => {
+    const originalInnerHeight = window.innerHeight;
+    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: 0 });
+
+    const items = [{ id: 1 }];
+    const container = document.createElement("div");
+    Object.defineProperty(container, 'clientHeight', { configurable: true, value: 0 });
+
+    const { result } = renderHook(() =>
+      useVirtualizer({
+        items,
+        virtual: undefined,
+        getScrollElement: () => container,
+      })
+    );
+
+    // Should use default 800
+    expect(result.current.totalSize).toBe(800);
+
+    Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: originalInnerHeight });
+  });
 });

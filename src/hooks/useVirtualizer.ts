@@ -48,6 +48,7 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
       const size = orientation === "vertical"
         ? scrollElement.clientHeight
         : scrollElement.clientWidth;
+
       if (size > 0) {
         setSizeState(prev => {
           // Only update if size changed or first measurement

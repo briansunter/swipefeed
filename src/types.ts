@@ -122,6 +122,11 @@ export interface SwipeDeckProps<T> extends SwipeDeckOptions<T> {
   children: (context: SwipeDeckRenderContext<T>) => React.ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  /**
+   * If true, applies styles to make the deck take up the full view height (100dvh) and width (100%).
+   * Helpful for full-screen video feeds to handle browser UI (address bar) correctly.
+   */
+  fullscreen?: boolean;
 }
 
 export interface SwipeDeckHandle extends SwipeDeckActions {

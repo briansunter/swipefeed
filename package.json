@@ -23,12 +23,14 @@
   "module": "./dist/index.js",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
+      "import": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./dist": "./dist/index.js",
+    "./src/*": "./src/*"
   },
   "scripts": {
-    "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap",
+    "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap --external react --external react-dom --external @tanstack/react-virtual",
     "docs:api": "typedoc",
     "docs:site": "typedoc --options typedoc.site.json",
     "example:build:site": "cd example && VITE_BASE=${VITE_BASE:-/swipefeed/example/} bun run build",

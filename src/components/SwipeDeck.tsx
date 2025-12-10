@@ -2,6 +2,7 @@
 import type React from "react";
 import { useImperativeHandle, useMemo } from "react";
 import { useSwipeDeck } from "../hooks/useSwipeDeck";
+import { SwipeItemContext } from "../hooks/useSwipeItem";
 import type { SwipeDeckHandle, SwipeDeckProps } from "../types";
 
 export function SwipeDeck<T>(
@@ -36,9 +37,21 @@ export function SwipeDeck<T>(
 
   const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
 
+  /* Fullscreen styles if enabled */
+  const fullscreenStyle: React.CSSProperties = props.fullscreen
+    ? {
+      height: "100dvh",
+      width: "100%",
+      position: "absolute",
+      top: 0,
+      left: 0,
+      overflow: "hidden",
+    }
+    : {};
+
   const viewportStyle = useMemo(
-    () => ({ ...virtualStyle, ...style }),
-    [virtualStyle, style],
+    () => ({ ...virtualStyle, ...fullscreenStyle, ...style }),
+    [virtualStyle, fullscreenStyle, style],
   );
 
   const contentStyle = useMemo<React.CSSProperties>(
@@ -91,19 +104,23 @@ export function SwipeDeck<T>(
             }
           }
 
+          const contextValue = {
+            item,
+            index: virtual.index,
+            isActive: deck.index === virtual.index,
+            shouldPreload,
+            props: itemProps,
+          };
+
           return (
             <article
               key={virtual.key}
               {...itemProps}
               aria-label={`Item ${virtual.index + 1} of ${deck.items.length}`}
             >
-              {children({
-                item,
-                index: virtual.index,
-                isActive: deck.index === virtual.index,
-                shouldPreload,
-                props: itemProps,
-              })}
+              <SwipeItemContext.Provider value={contextValue}>
+                {children(contextValue)}
+              </SwipeItemContext.Provider>
             </article>
           );
         })}
