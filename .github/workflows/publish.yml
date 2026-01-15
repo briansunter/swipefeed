@@ -1,0 +1,167 @@
+name: Publish to npm
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (skip publishing)'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  id-token: write  # Required for npm provenance
+
+jobs:
+  validate:
+    name: Validate & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            .bun-cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Type check
+        run: bun run typecheck
+
+      - name: Run tests
+        run: bun run test
+
+  release:
+    name: Release & Publish
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            .bun-cache
+          key: ubuntu-latest-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ubuntu-latest-bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build package
+        run: bun run build
+
+      - name: Get NPM token from Bitwarden Secrets Manager
+        id: bws
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            ${{ secrets.BWS_NPM_TOKEN_ID }} > NPM_TOKEN
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create .npmrc
+        run: |
+          echo "//registry.npmjs.org/:_authToken=\${NPM_TOKEN}" > .npmrc
+          echo "package-lock=false" >> .npmrc
+        env:
+          NPM_TOKEN: ${{ steps.bws.outputs.NPM_TOKEN }}
+
+      - name: Release with semantic-release
+        id: release
+        run: |
+          bunx -y semantic-release \
+            --branches master \
+            --tagFormat 'v${version}' \
+            --repositoryUrl "https://github.com/${{ github.repository }}.git"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ steps.bws.outputs.NPM_TOKEN }}
+          GIT_AUTHOR_NAME: github-actions[bot]
+          GIT_AUTHOR_EMAIL: github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME: github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+
+  dry-run:
+    name: Dry Run (Testing)
+    needs: validate
+    runs-on: ubuntu-latest
+    if: github.event.inputs.dry_run == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build package
+        run: bun run build
+
+      - name: Get NPM token from Bitwarden Secrets Manager
+        id: bws
+        uses: bitwarden/sm-action@v2
+        with:
+          access_token: ${{ secrets.BWS_ACCESS_TOKEN }}
+          secrets: |
+            ${{ secrets.BWS_NPM_TOKEN_ID }} > NPM_TOKEN
+
+      - name: Dry run semantic-release
+        run: |
+          bunx -y semantic-release \
+            --dry-run \
+            --branches master \
+            --tagFormat "v${version}" \
+            --no-ci
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ steps.bws.outputs.NPM_TOKEN }}
