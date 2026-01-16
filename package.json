@@ -30,7 +30,7 @@
   },
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap --external react --external react-dom --external @tanstack/react-virtual && tsc --declaration --emitDeclarationOnly --outDir dist --noEmit false",
+    "build": "bun build src/index.ts --target=browser --outdir=dist --sourcemap --production --external react --external react-dom --external @tanstack/react-virtual && tsc --declaration --emitDeclarationOnly --outDir dist --noEmit false",
     "prepublishOnly": "bun run build",
     "docs:api": "typedoc",
     "docs:site": "typedoc --options typedoc.site.json",
