@@ -112,12 +112,16 @@ export function SwipeDeck<T>(
             }
           }
 
+          // Don't pass style to children - the article wrapper already handles positioning
+          // Children should use inset: 0 to fill the parent
+          const { style: _positioningStyle, ...propsWithoutStyle } = itemProps;
+
           const contextValue = {
             item,
             index: itemIndex,
             isActive: deck.index === itemIndex,
             shouldPreload,
-            props: itemProps,
+            props: propsWithoutStyle,
           };
 
           // Use virtualItem.key for stable keys

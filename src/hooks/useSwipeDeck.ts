@@ -56,18 +56,20 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const loop = options.loop ?? DEFAULTS.loop;
   const defaultIndex = options.defaultIndex ?? DEFAULTS.defaultIndex;
   const preload = options.preload ?? 0;
+  const preloadPrevious = options.preloadPrevious ?? 0;
 
   const gestureCfg = useMemo(() => ({ ...DEFAULTS.gesture, ...(options.gesture ?? {}) }), [options.gesture]);
   const wheelCfg = useMemo(() => ({ ...DEFAULTS.wheel, ...(options.wheel ?? {}) }), [options.wheel]);
   const keyboardCfg = useMemo(() => ({ ...DEFAULTS.keyboard, ...(options.keyboard ?? {}) }), [options.keyboard]);
   const virtualCfg = useMemo(() => {
     const base = { ...DEFAULTS.virtual, ...(options.virtual ?? {}) };
-    // Ensure overscan is at least as large as preload to ensure preloaded items are rendered
+    // Ensure overscan is at least as large as preload + preloadPrevious to ensure all preloaded items are rendered
+    const minOverscan = Math.max(preload, preloadPrevious);
     return {
       ...base,
-      overscan: Math.max(base.overscan ?? 0, preload),
+      overscan: Math.max(base.overscan ?? 0, minOverscan),
     };
-  }, [options.virtual, preload]);
+  }, [options.virtual, preload, preloadPrevious]);
   const endReachedThreshold = options.endReachedThreshold ?? DEFAULTS.endReachedThreshold;
   const ariaLabel = options.ariaLabel ?? DEFAULTS.ariaLabel;
   const keyboardNavigation = options.keyboardNavigation ?? true;
@@ -85,6 +87,9 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const dragStartScrollRef = useRef<number>(0);
   const isNavigatingRef = useRef(false); // Track programmatic navigation to prevent scroll handler interference
   const snapRestoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Track snap restore timeout
+  const navigationStartRef = useRef<number>(0); // Track when navigation started for safety timeout
+  const lastNavigationIndexRef = useRef<number>(-1); // Prevent duplicate navigations to same index
+  const lastNavigationTimeRef = useRef<number>(0); // Cooldown between navigations
 
   useEffect(() => {
     // Clamp index when items change
@@ -156,6 +161,14 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Don't navigate to same index unless it's a snap/correction
       if (next === index && source !== "snap") return;
 
+      // Prevent rapid duplicate navigations (within 300ms to same index)
+      const now = Date.now();
+      if (next === lastNavigationIndexRef.current && now - lastNavigationTimeRef.current < 300) {
+        return;
+      }
+      lastNavigationIndexRef.current = next;
+      lastNavigationTimeRef.current = now;
+
       sourceRef.current = source;
 
       // Mark as navigating to prevent handleScroll from interfering
@@ -183,22 +196,44 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Manual scroll calculation
       const targetScroll = next * virtualizer.containerSize;
 
+      // Track navigation start time for safety timeout
+      navigationStartRef.current = Date.now();
+
       if (orientation === 'vertical') {
         viewport.scrollTo({ top: targetScroll, behavior: targetBehavior });
       } else {
         viewport.scrollTo({ left: targetScroll, behavior: targetBehavior });
       }
 
-      // Re-enable scroll-snap after animation completes
-      const restoreDelay = targetBehavior === 'smooth' ? 400 : 50;
-      snapRestoreTimeoutRef.current = setTimeout(() => {
+      // Handler to restore scroll-snap after navigation completes
+      const handleScrollEnd = () => {
         isNavigatingRef.current = false;
-        snapRestoreTimeoutRef.current = null;
-        // Always restore scroll-snap
+        if (snapRestoreTimeoutRef.current) {
+          clearTimeout(snapRestoreTimeoutRef.current);
+          snapRestoreTimeoutRef.current = null;
+        }
         if (viewport) {
           viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
         }
-      }, restoreDelay);
+      };
+
+      // Use scrollend event if available (modern browsers), with fallback timeout
+      if ('onscrollend' in window) {
+        const scrollEndHandler = () => {
+          handleScrollEnd();
+          viewport.removeEventListener('scrollend', scrollEndHandler);
+        };
+        viewport.addEventListener('scrollend', scrollEndHandler, { once: true });
+        // Safety fallback in case scrollend never fires
+        snapRestoreTimeoutRef.current = setTimeout(() => {
+          viewport.removeEventListener('scrollend', scrollEndHandler);
+          handleScrollEnd();
+        }, 800);
+      } else {
+        // Fallback for browsers without scrollend support
+        const restoreDelay = targetBehavior === 'smooth' ? 500 : 50;
+        snapRestoreTimeoutRef.current = setTimeout(handleScrollEnd, restoreDelay);
+      }
     },
     []
   );
@@ -288,6 +323,12 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const scrollEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleScroll = useCallback(() => {
+    // Safety: Force unlock if navigation has been stuck for too long (1.5 seconds)
+    if (isNavigatingRef.current && Date.now() - navigationStartRef.current > 1500) {
+      isNavigatingRef.current = false;
+      console.warn('[SwipeDeck] Navigation lock timeout - forcing unlock');
+    }
+
     // Skip scroll-based index calculation during programmatic navigation
     if (isNavigatingRef.current) return;
 
@@ -302,7 +343,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       const computedSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
       const idealOffset = index * computedSize;
 
-      if (Math.abs(scrollOffset - idealOffset) > 2) {
+      // Use device pixel ratio for tolerance to handle high-DPI displays
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio : 1;
+      const tolerance = Math.max(5, Math.ceil(5 * dpr));
+      if (Math.abs(scrollOffset - idealOffset) > tolerance) {
         // We are stuck between frames. Snap to the current detected index.
         viewport.scrollTo({
           top: orientation === "vertical" ? idealOffset : 0,
