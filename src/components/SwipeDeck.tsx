@@ -78,7 +78,12 @@ export function SwipeDeck<T>(
       style={viewportStyle}
     >
       <div style={contentStyle}>
-        {deck.items.map((item, itemIndex) => {
+        {/* Use virtualItems for windowed rendering - only renders visible + overscan items */}
+        {deck.virtualItems.map((virtualItem) => {
+          const itemIndex = virtualItem.index;
+          const item = deck.items[itemIndex];
+          if (!item) return null;
+
           const itemProps = deck.getItemProps(itemIndex);
           const preload = options.preload ?? 0;
           const preloadPrevious = options.preloadPrevious ?? 0;
@@ -115,8 +120,8 @@ export function SwipeDeck<T>(
             props: itemProps,
           };
 
-          // Generate stable key from item if possible, otherwise use index
-          const itemKey = options.virtual?.getItemKey?.(item, itemIndex) ?? itemIndex;
+          // Use virtualItem.key for stable keys
+          const itemKey = virtualItem.key ?? (options.virtual?.getItemKey?.(item, itemIndex) ?? itemIndex);
 
           return (
             <article

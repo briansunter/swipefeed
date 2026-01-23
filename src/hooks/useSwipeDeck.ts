@@ -84,6 +84,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const sourceRef = useRef<IndexChangeSource>("snap");
   const dragStartScrollRef = useRef<number>(0);
   const isNavigatingRef = useRef(false); // Track programmatic navigation to prevent scroll handler interference
+  const snapRestoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Track snap restore timeout
 
   useEffect(() => {
     // Clamp index when items change
@@ -166,16 +167,20 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       if (!viewport) return;
 
+      // Clear any pending snap restore timeout
+      if (snapRestoreTimeoutRef.current) {
+        clearTimeout(snapRestoreTimeoutRef.current);
+        snapRestoreTimeoutRef.current = null;
+      }
+
       // CRITICAL: Temporarily disable scroll-snap during programmatic navigation
-      // This prevents CSS from fighting with our scroll position, while allowing
-      // use to use smooth scrolling
-      const originalSnapType = viewport.style.scrollSnapType;
+      // This prevents CSS from fighting with our scroll position
       viewport.style.scrollSnapType = 'none';
-      viewport.style.scrollBehavior = 'auto'; // Let virtualizer handle behavior
+      viewport.style.scrollBehavior = 'auto';
 
       const targetBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
 
-      // Manual scroll calculation to bypass virtualizer's dynamic size check which warns on smooth scroll
+      // Manual scroll calculation
       const targetScroll = next * virtualizer.containerSize;
 
       if (orientation === 'vertical') {
@@ -184,15 +189,16 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         viewport.scrollTo({ left: targetScroll, behavior: targetBehavior });
       }
 
-      // Re-enable scroll-snap after animation completes to lock it in
-      // 600ms is usually enough for smooth scroll to finish
-      setTimeout(() => {
+      // Re-enable scroll-snap after animation completes
+      const restoreDelay = targetBehavior === 'smooth' ? 400 : 50;
+      snapRestoreTimeoutRef.current = setTimeout(() => {
         isNavigatingRef.current = false;
-        viewport.style.scrollSnapType = originalSnapType || (orientation === 'vertical' ? 'y mandatory' : 'x mandatory');
-
-        // Ensure we are perfectly snapped if the animation didn't land exactly 
-        // (though virtualizer usually nails it)
-      }, targetBehavior === 'smooth' ? 600 : 50);
+        snapRestoreTimeoutRef.current = null;
+        // Always restore scroll-snap
+        if (viewport) {
+          viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
+        }
+      }, restoreDelay);
     },
     []
   );
@@ -215,8 +221,21 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       } else {
         viewport.scrollLeft = newScroll;
       }
-      // Force immediate scroll handling for smooth drag
     }
+  }, []);
+
+  // Calculate target index from current scroll position (for snap correction)
+  const getSnapTargetIndex = useCallback(() => {
+    const { viewport, orientation, items, virtualizer } = latest.current;
+    if (!viewport || items.length === 0) return latest.current.index;
+
+    const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+    const itemSize = virtualizer.containerSize || viewport.clientHeight;
+
+    if (itemSize <= 0) return latest.current.index;
+
+    const targetIndex = Math.round(scrollOffset / itemSize);
+    return clamp(targetIndex, 0, items.length - 1);
   }, []);
 
   const wheel = useWheel({
@@ -230,7 +249,11 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     viewport,
     onDragStart,
     onDrag,
-    onDragEnd: () => navigateTo(latest.current.index, "snap"),
+    onDragEnd: () => {
+      // Calculate correct target from scroll position, not from state
+      const targetIndex = getSnapTargetIndex();
+      navigateTo(targetIndex, "snap");
+    },
   });
 
   const gestures = useGestures({
