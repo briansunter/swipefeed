@@ -43,7 +43,7 @@ describe("useSwipeDeck loop + controlled reconciliation", () => {
     );
 
     result.current.next();
-    expect(onIndexChange).toHaveBeenCalledWith(1, "user:keyboard");
+    expect(onIndexChange).toHaveBeenCalledWith(1, "programmatic");
 
     rerender({ idx: 2 });
     expect(result.current.index).toBe(2);

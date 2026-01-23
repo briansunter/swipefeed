@@ -92,6 +92,8 @@ describe("useWheel tracking", () => {
         element.dispatchEvent(new WheelEvent("wheel", { deltaY: 120 }));
 
         expect(onRequestIndexChange).toHaveBeenCalledWith(1);
-        expect(onDragEnd).toHaveBeenCalled(); // endGesture calls onDragEnd
+        // onDragEnd should NOT be called when threshold is reached
+        // onDragEnd is only for when gesture ends WITHOUT navigation (snap-back scenario)
+        expect(onDragEnd).not.toHaveBeenCalled();
     });
 });

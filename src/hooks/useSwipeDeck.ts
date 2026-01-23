@@ -163,14 +163,15 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       const now = Date.now();
 
-      // Block ALL navigation while one is in progress (except snap corrections)
-      if (isNavigatingRef.current && source !== "snap") {
+      // Block ALL navigation while one is in progress (except snap corrections and programmatic)
+      if (isNavigatingRef.current && source !== "snap" && source !== "programmatic") {
         return;
       }
 
       // Minimum cooldown between ANY navigations (prevents multi-swipe)
+      // Programmatic navigation bypasses cooldown since it's explicit API usage
       const MIN_NAVIGATION_COOLDOWN = 250;
-      if (now - lastNavigationTimeRef.current < MIN_NAVIGATION_COOLDOWN && source !== "snap") {
+      if (now - lastNavigationTimeRef.current < MIN_NAVIGATION_COOLDOWN && source !== "snap" && source !== "programmatic") {
         return;
       }
 
@@ -537,8 +538,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     [index, orientation],
   );
 
-  const prev = useCallback(() => navigateTo(latest.current.index - 1, "user:keyboard"), [navigateTo]);
-  const next = useCallback(() => navigateTo(latest.current.index + 1, "user:keyboard"), [navigateTo]);
+  const prev = useCallback(() => navigateTo(latest.current.index - 1, "programmatic"), [navigateTo]);
+  const next = useCallback(() => navigateTo(latest.current.index + 1, "programmatic"), [navigateTo]);
 
   const api: SwipeDeckAPI<T> = useMemo(() => ({
     ...apiState,

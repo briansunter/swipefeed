@@ -145,8 +145,15 @@ export function useWheel(params: UseWheelParams) {
       if (matchesThreshold || isFlick) {
         const navDelta: 1 | -1 = accumulated.current > 0 ? 1 : -1;
 
-        // Reset
-        endGesture();
+        // Reset tracking state without calling onDragEnd
+        // onDragEnd is for when gesture ends WITHOUT navigation (snap back)
+        // Here we ARE navigating, so we skip onDragEnd to avoid a competing snap navigation
+        isTracking.current = false;
+        accumulated.current = 0;
+        gestureDirection.current = null;
+        eventCount.current = 0;
+        velocityRef.current = 0;
+
         lastNavigationTime.current = now;
         isInCooldown.current = true;
         if (timeoutRef.current) clearTimeout(timeoutRef.current);

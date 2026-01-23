@@ -100,7 +100,7 @@ describe("useSwipeDeck callbacks", () => {
         });
 
         // Loop should wrap to last item
-        expect(onIndexChange).toHaveBeenCalledWith(2, "user:keyboard");
+        expect(onIndexChange).toHaveBeenCalledWith(2, "programmatic");
     });
 
     it("handles empty items array", () => {
