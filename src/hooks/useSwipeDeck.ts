@@ -161,11 +161,19 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Don't navigate to same index unless it's a snap/correction
       if (next === index && source !== "snap") return;
 
-      // Prevent rapid duplicate navigations (within 300ms to same index)
       const now = Date.now();
-      if (next === lastNavigationIndexRef.current && now - lastNavigationTimeRef.current < 300) {
+
+      // Block ALL navigation while one is in progress (except snap corrections)
+      if (isNavigatingRef.current && source !== "snap") {
         return;
       }
+
+      // Minimum cooldown between ANY navigations (prevents multi-swipe)
+      const MIN_NAVIGATION_COOLDOWN = 250;
+      if (now - lastNavigationTimeRef.current < MIN_NAVIGATION_COOLDOWN && source !== "snap") {
+        return;
+      }
+
       lastNavigationIndexRef.current = next;
       lastNavigationTimeRef.current = now;
 
