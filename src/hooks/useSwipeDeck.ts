@@ -135,7 +135,11 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const applyIndexChange = useCallback(
     (nextIndex: number) => {
       const { index, isControlled, options, setInternalIndex, setIsAnimating } = latest.current;
-      if (nextIndex === index) return;
+      if (nextIndex === index) {
+        // Already at this index, no need to update
+        return;
+      }
+      console.log('[SwipeDeck] applyIndexChange (from scroll)', { from: index, to: nextIndex, source: sourceRef.current });
       if (!isControlled) setInternalIndex(nextIndex);
       options.onIndexChange?.(nextIndex, sourceRef.current ?? "snap");
       setIsAnimating(false);
@@ -163,8 +167,16 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       const now = Date.now();
 
+      // Safety reset: Clear stuck navigation state if it's been too long (600ms)
+      // This prevents isNavigatingRef from permanently blocking navigation
+      if (isNavigatingRef.current && now - navigationStartRef.current > 600) {
+        console.warn('[SwipeDeck] Clearing stuck navigation state');
+        isNavigatingRef.current = false;
+      }
+
       // Block ALL navigation while one is in progress (except snap corrections and programmatic)
       if (isNavigatingRef.current && source !== "snap" && source !== "programmatic") {
+        console.log('[SwipeDeck] navigateTo blocked: isNavigating', { source, targetIndex: next });
         return;
       }
 
@@ -172,8 +184,11 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Programmatic navigation bypasses cooldown since it's explicit API usage
       const MIN_NAVIGATION_COOLDOWN = 250;
       if (now - lastNavigationTimeRef.current < MIN_NAVIGATION_COOLDOWN && source !== "snap" && source !== "programmatic") {
+        console.log('[SwipeDeck] navigateTo blocked: cooldown', { source, targetIndex: next, timeSinceLastNav: now - lastNavigationTimeRef.current });
         return;
       }
+
+      console.log('[SwipeDeck] navigateTo executing', { source, from: index, to: next });
 
       lastNavigationIndexRef.current = next;
       lastNavigationTimeRef.current = now;
@@ -185,9 +200,13 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       // Update index immediately
       if (!isControlled) setInternalIndex(next);
+      console.log('[SwipeDeck] calling onIndexChange', { next, source });
       options.onIndexChange?.(next, source);
 
-      if (!viewport) return;
+      if (!viewport) {
+        console.warn('[SwipeDeck] No viewport, skipping scroll');
+        return;
+      }
 
       // Clear any pending snap restore timeout
       if (snapRestoreTimeoutRef.current) {
@@ -200,22 +219,36 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       viewport.style.scrollSnapType = 'none';
       viewport.style.scrollBehavior = 'auto';
 
-      const targetBehavior = behavior ?? (prefersReducedMotion() ? "instant" : "smooth");
+      // Use instant scroll for wheel and programmatic navigation to avoid timing issues
+      // Smooth scroll can cause scrollend to fire late, keeping isNavigatingRef stuck
+      // Only gestures get smooth scroll since they have visual drag feedback
+      const targetBehavior = behavior ?? (
+        source === "user:wheel" || source === "programmatic" || prefersReducedMotion() ? "instant" : "smooth"
+      );
 
       // Manual scroll calculation
       const targetScroll = next * virtualizer.containerSize;
+      console.log('[SwipeDeck] scrolling to', { targetScroll, containerSize: virtualizer.containerSize, next, behavior: targetBehavior });
 
       // Track navigation start time for safety timeout
       navigationStartRef.current = Date.now();
 
       if (orientation === 'vertical') {
         viewport.scrollTo({ top: targetScroll, behavior: targetBehavior });
+        // For instant scroll, verify scroll position immediately
+        if (targetBehavior === 'instant') {
+          console.log('[SwipeDeck] after scrollTo', { targetScroll, actualScroll: viewport.scrollTop });
+        }
       } else {
         viewport.scrollTo({ left: targetScroll, behavior: targetBehavior });
+        if (targetBehavior === 'instant') {
+          console.log('[SwipeDeck] after scrollTo', { targetScroll, actualScroll: viewport.scrollLeft });
+        }
       }
 
       // Handler to restore scroll-snap after navigation completes
       const handleScrollEnd = () => {
+        console.log('[SwipeDeck] handleScrollEnd - clearing navigation lock');
         isNavigatingRef.current = false;
         if (snapRestoreTimeoutRef.current) {
           clearTimeout(snapRestoreTimeoutRef.current);
@@ -233,11 +266,11 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
           viewport.removeEventListener('scrollend', scrollEndHandler);
         };
         viewport.addEventListener('scrollend', scrollEndHandler, { once: true });
-        // Safety fallback in case scrollend never fires
+        // Safety fallback in case scrollend never fires (reduced from 800ms to 400ms)
         snapRestoreTimeoutRef.current = setTimeout(() => {
           viewport.removeEventListener('scrollend', scrollEndHandler);
           handleScrollEnd();
-        }, 800);
+        }, 400);
       } else {
         // Fallback for browsers without scrollend support
         const restoreDelay = targetBehavior === 'smooth' ? 500 : 50;
@@ -384,6 +417,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       if (viewportSize > 0 && items.length > 0) {
         const estimatedIndex = Math.round(scrollOffset / viewportSize);
         const newIndex = clamp(estimatedIndex, 0, items.length - 1);
+        // Only log if index would change
+        if (newIndex !== latest.current.index) {
+          console.log('[SwipeDeck] handleScroll calculated index', { scrollOffset, viewportSize, estimatedIndex, newIndex, currentIndex: latest.current.index });
+        }
         applyIndexChange(newIndex);
       }
     });

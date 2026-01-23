@@ -92,6 +92,10 @@ export function SwipeDeck<T>(
           // Check if we should preload (either next items or previous items)
           if (preload > 0 || preloadPrevious > 0) {
             const currentIndex = deck.index;
+            // Log preload calculation for debugging
+            if (itemIndex <= currentIndex + preload + 1 && itemIndex >= currentIndex - preloadPrevious - 1) {
+              console.log('[SwipeDeck] preload check', { itemIndex, currentIndex, preload, preloadPrevious });
+            }
 
             if (!options.loop) {
               // Non-loop: simple index comparison

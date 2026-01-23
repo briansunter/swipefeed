@@ -87,10 +87,20 @@ export function useWheel(params: UseWheelParams) {
 
       const now = performance.now();
 
-      // Strict cooldown check
+      // Strict cooldown check - during cooldown, ignore events WITHOUT triggering snap
       if (isInCooldown.current) {
         if (now - lastNavigationTime.current < cooldown) {
-          if (isTracking.current) endGesture();
+          // Reset tracking state WITHOUT calling onDragEnd (which triggers snap navigation)
+          // We don't want snap to fight with the navigation that just happened
+          if (isTracking.current) {
+            console.log('[useWheel] Ignoring wheel event during cooldown');
+            isTracking.current = false;
+            accumulated.current = 0;
+            gestureDirection.current = null;
+            eventCount.current = 0;
+            velocityRef.current = 0;
+            // NOTE: NOT calling onDragEnd here to avoid triggering snap
+          }
           return;
         }
         isInCooldown.current = false;
@@ -145,6 +155,15 @@ export function useWheel(params: UseWheelParams) {
       if (matchesThreshold || isFlick) {
         const navDelta: 1 | -1 = accumulated.current > 0 ? 1 : -1;
 
+        console.log('[useWheel] Navigation triggered', {
+          navDelta,
+          accumulated: accumulated.current,
+          threshold,
+          matchesThreshold,
+          isFlick,
+          velocity: velocityRef.current,
+        });
+
         // Reset tracking state without calling onDragEnd
         // onDragEnd is for when gesture ends WITHOUT navigation (snap back)
         // Here we ARE navigating, so we skip onDragEnd to avoid a competing snap navigation
@@ -178,7 +197,6 @@ export function useWheel(params: UseWheelParams) {
     onRequestIndexChange,
     resetAccumulated,
     viewport,
-    endGesture,
     onDragStart,
     onDrag
   ]);
