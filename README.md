@@ -1,3 +1,5 @@
+![swipefeed: headless React primitives for swipe feeds](docs/banner.png)
+
 # swipefeed
 
 ![CI Status](https://github.com/briansunter/swipefeed/actions/workflows/ci.yml/badge.svg)
@@ -7,6 +9,8 @@
 
 
 Headless React primitives for building TikTok/Reels-style swipe feeds. Ships a render-prop component (`SwipeDeck`) and a hook (`useSwipeDeck`) that wire up native scroll-snap, TanStack virtualization, gesture/wheel/keyboard inputs, accessibility, and programmatic controls.
+
+![How swipefeed works: pointer / wheel / keyboard / programmatic inputs flow into a core engine that normalizes intent, resolves target index, manages animation, and updates state, then layout & virtualization (TanStack Virtual) emit native scroll-snap output with accessibility roles and end-reached callbacks](docs/explainer.png)
 
 ## Highlights
 
