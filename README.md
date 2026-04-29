@@ -1,4 +1,6 @@
-![swipefeed: headless React primitives for swipe feeds](docs/banner.png)
+<p align="center">
+  <img src="docs/banner.png" alt="swipefeed: headless React primitives for swipe feeds" width="320">
+</p>
 
 # swipefeed
 
