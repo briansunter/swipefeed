@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { App, VideoCard } from "./index";
+import { App, VideoCard, YouTubePlayer } from "./index";
 
 const VIDEO_ITEM = {
   id: "test-video",
@@ -45,16 +45,39 @@ describe("demo shared-player architecture", () => {
   });
 
   it("hands the poster off without putting an opaque card over the player", () => {
-    const { rerender } = render(<VideoCard item={VIDEO_ITEM} isPlaying={false} />);
+    const { rerender } = render(<VideoCard item={VIDEO_ITEM} isPlayerReady={false} />);
 
     const card = screen.getByTestId("video-card-test-video");
     const poster = screen.getByTestId("video-poster-test-video");
     expect(card).not.toHaveClass("bg-black");
     expect(poster).toHaveClass("opacity-100");
 
-    rerender(<VideoCard item={VIDEO_ITEM} isPlaying />);
+    rerender(<VideoCard item={VIDEO_ITEM} isPlayerReady />);
 
     expect(card).not.toHaveClass("bg-black");
     expect(poster).toHaveClass("opacity-0");
+  });
+
+  it("uses matched cover geometry and fade timing on both sides of the handoff", () => {
+    render(
+      <>
+        <YouTubePlayer
+          youtubeId={VIDEO_ITEM.youtubeId}
+          isMuted
+          registerPlayer={() => () => undefined}
+        />
+        <VideoCard item={VIDEO_ITEM} isPlayerReady={false} />
+      </>,
+    );
+
+    expect(screen.getByTitle("YouTube video player")).toHaveClass(
+      "duration-300",
+      "ease-in-out",
+    );
+    expect(screen.getByAltText("Cover")).toHaveClass("scale-125", "origin-center");
+    expect(screen.getByTestId("video-poster-test-video")).toHaveClass(
+      "duration-300",
+      "ease-in-out",
+    );
   });
 });

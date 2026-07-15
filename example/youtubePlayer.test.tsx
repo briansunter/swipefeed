@@ -123,6 +123,41 @@ describe("YouTubePlayer", () => {
     expect(screen.getByTestId("youtube-player")).toHaveAttribute("data-player-state", "1");
   });
 
+  it("reports the current video ready only after YouTube reaches playing state", async () => {
+    const registerPlayer = vi.fn(() => vi.fn());
+    const onPlaybackReadyChange = vi.fn();
+    const { rerender } = render(
+      <YouTubePlayer
+        youtubeId={TEST_IDS[0]}
+        isMuted
+        registerPlayer={registerPlayer}
+        onPlaybackReadyChange={onPlaybackReadyChange}
+      />,
+    );
+    const iframe = screen.getByTitle("YouTube video player") as HTMLIFrameElement;
+
+    expect(onPlaybackReadyChange).toHaveBeenLastCalledWith(TEST_IDS[0], false);
+
+    fireEvent.load(iframe);
+    act(() => dispatchPlayerMessage(iframe, { event: "onStateChange", info: 3 }));
+    expect(onPlaybackReadyChange).not.toHaveBeenCalledWith(TEST_IDS[0], true);
+
+    act(() => dispatchPlayerMessage(iframe, { event: "onStateChange", info: 1 }));
+    expect(onPlaybackReadyChange).toHaveBeenLastCalledWith(TEST_IDS[0], true);
+
+    rerender(
+      <YouTubePlayer
+        youtubeId={TEST_IDS[1]}
+        isMuted
+        registerPlayer={registerPlayer}
+        onPlaybackReadyChange={onPlaybackReadyChange}
+      />,
+    );
+    await act(async () => vi.advanceTimersByTime(100));
+
+    expect(onPlaybackReadyChange).toHaveBeenLastCalledWith(TEST_IDS[1], false);
+  });
+
   it("shows a terminal fallback and stops retrying when YouTube rejects a video", async () => {
     const registerPlayer = vi.fn(() => vi.fn());
     const { rerender } = render(

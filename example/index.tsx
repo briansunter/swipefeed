@@ -46,6 +46,7 @@ type VideoItem = {
 
 export type PlayerAudioController = (isMuted: boolean) => boolean;
 type RegisterPlayer = (controller: PlayerAudioController) => () => void;
+type PlaybackReadyChange = (youtubeId: string, isReady: boolean) => void;
 
 const COLOR_PALETTE = ["#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#2196F3"];
 
@@ -127,7 +128,17 @@ const BottomNav = () => (
   </nav>
 );
 
-export const YouTubePlayer = ({ youtubeId, isMuted, registerPlayer }: { youtubeId: string; isMuted: boolean; registerPlayer: RegisterPlayer }) => {
+export const YouTubePlayer = ({
+  youtubeId,
+  isMuted,
+  registerPlayer,
+  onPlaybackReadyChange,
+}: {
+  youtubeId: string;
+  isMuted: boolean;
+  registerPlayer: RegisterPlayer;
+  onPlaybackReadyChange?: PlaybackReadyChange;
+}) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
   const [isApiReady, setIsApiReady] = useState(false);
@@ -236,6 +247,10 @@ export const YouTubePlayer = ({ youtubeId, isMuted, registerPlayer }: { youtubeI
   const isCurrentVideoReady = isVideoReady && currentVideoIdRef.current === youtubeId;
   const isCurrentVideoFailed = playerError !== null && currentVideoIdRef.current === youtubeId;
 
+  useEffect(() => {
+    onPlaybackReadyChange?.(youtubeId, isCurrentVideoReady);
+  }, [isCurrentVideoReady, onPlaybackReadyChange, youtubeId]);
+
   return (
     <div
       data-testid="youtube-player"
@@ -248,21 +263,20 @@ export const YouTubePlayer = ({ youtubeId, isMuted, registerPlayer }: { youtubeI
       <iframe
         ref={iframeRef}
         onLoad={() => {
-          setIsVideoReady(true);
           setIsApiReady(true);
         }}
         src={getYouTubeEmbedUrl(initialVideoIdRef.current)}
-        className={`w-full h-full object-cover transition-opacity duration-300 ease-in scale-125 origin-center pointer-events-none ${isCurrentVideoReady ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full object-cover transition-opacity duration-300 ease-in-out scale-125 origin-center pointer-events-none ${isCurrentVideoReady ? 'opacity-100' : 'opacity-0'}`}
         title="YouTube video player"
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
       />
-      <div className={`absolute inset-0 bg-black transition-opacity duration-300 ease-out pointer-events-none ${isCurrentVideoReady ? 'opacity-0' : 'opacity-100'}`}>
+      <div className={`absolute inset-0 bg-black transition-opacity duration-300 ease-in-out pointer-events-none ${isCurrentVideoReady ? 'opacity-0' : 'opacity-100'}`}>
         <img
           src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
           alt="Cover"
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover scale-125 origin-center"
           onError={(e) => {
             (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
           }}
@@ -312,9 +326,9 @@ const VideoSidebar = ({ item }: { item: VideoItem }) => (
   </div>
 );
 
-export const VideoCard = ({ item, isPlaying }: { item: VideoItem; isPlaying: boolean }) => (
+export const VideoCard = ({ item, isPlayerReady }: { item: VideoItem; isPlayerReady: boolean }) => (
   <div data-testid={`video-card-${item.id}`} className="w-full h-full relative overflow-hidden">
-    <div data-testid={`video-poster-${item.id}`} className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-150 ease-linear ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
+    <div data-testid={`video-poster-${item.id}`} className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-300 ease-in-out ${isPlayerReady ? 'opacity-0' : 'opacity-100'}`}>
       <img
         src={`https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`}
         alt={`Preview for ${item.description}`}
@@ -338,6 +352,7 @@ export function App() {
   const [isMuted, setIsMuted] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
   const [playingIndex, setPlayingIndex] = useState(0);
+  const [readyVideoId, setReadyVideoId] = useState<string | null>(null);
   const playerControllerRef = useRef<PlayerAudioController | null>(null);
   const deckRef = useRef<SwipeDeckHandle>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
@@ -359,6 +374,13 @@ export function App() {
 
   const handleIndexChange = useCallback((nextIndex: number, _source: IndexChangeSource) => {
     setActiveIndex(nextIndex);
+  }, []);
+
+  const handlePlaybackReadyChange = useCallback<PlaybackReadyChange>((youtubeId, isReady) => {
+    setReadyVideoId((current) => {
+      if (isReady) return youtubeId;
+      return current === youtubeId ? null : current;
+    });
   }, []);
 
   useEffect(() => {
@@ -404,7 +426,12 @@ export function App() {
       {/* Constrain to mobile-like width on desktop */}
       <main className="w-full max-w-[430px] h-full relative text-white bg-black">
         <div data-testid="shared-youtube-player" ref={playerContainerRef} className="absolute inset-0 z-0 will-change-transform">
-          <YouTubePlayer youtubeId={items[playingIndex].youtubeId} isMuted={isMuted} registerPlayer={registerPlayer} />
+          <YouTubePlayer
+            youtubeId={items[playingIndex].youtubeId}
+            isMuted={isMuted}
+            registerPlayer={registerPlayer}
+            onPlaybackReadyChange={handlePlaybackReadyChange}
+          />
         </div>
         <MuteButton isMuted={isMuted} toggleMute={toggleMute} />
         <Header />
@@ -421,7 +448,12 @@ export function App() {
             preload={2} // Preload the next 2 videos
             preloadPrevious={1} // Keep the previous video preloaded
           >
-            {({ item, index }) => <VideoCard item={item} isPlaying={index === playingIndex} />}
+            {({ item, index }) => (
+              <VideoCard
+                item={item}
+                isPlayerReady={index === playingIndex && readyVideoId === item.youtubeId}
+              />
+            )}
           </SwipeDeck>
         </div>
         <BottomNav />
