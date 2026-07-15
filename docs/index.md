@@ -70,9 +70,9 @@ function CustomLayout({ items }) {
 
 Extends `SwipeDeckOptions<T>` plus:
 - `as`: custom element/component for the viewport (default `"div"`).
-- `children(context)`: render prop receiving `{ item, index, isActive, props }`.
+- `children(context)`: render prop receiving `{ item, index, isActive, shouldPreload, props }`.
 - `className`, `style`: forwarded to the viewport.
-- `ref`: imperative handle (`SwipeDeckHandle`) exposing `prev`, `next`, `scrollTo`, `getState`.
+- `ref`: imperative handle (`SwipeDeckHandle`) exposing `prev`, `next`, `scrollTo`, `getState`, `getMotion`.
 
 ### `SwipeDeckOptions<T>`
 
@@ -81,7 +81,8 @@ Extends `SwipeDeckOptions<T>` plus:
 - `direction`: `"ltr"` (default) | `"rtl"` (affects horizontal wheel/gestures/keyboard).
 - `defaultIndex`: initial index for uncontrolled mode (default `0`).
 - `index`: controlled index; when set, update it yourself in `onIndexChange`.
-- `onIndexChange(index, source)`: fires for every navigation. `source` is one of `"user:gesture" | "user:wheel" | "user:keyboard" | "programmatic" | "snap"`.
+- `onIndexChange(index, source)`: fires for every navigation. `source` is one of `"user:gesture" | "user:wheel" | "user:keyboard" | "programmatic" | "visibility" | "snap"`.
+- `onMotionChange(motion)`: animation-frame-throttled continuous motion callback that stays outside React render state.
 - `loop`: wrap navigation at the ends (default `false`).
 - `gesture`: `{ threshold, flickVelocity, lockAxis, ignoreWhileAnimating }` (defaults `10`, `0.1`, `true`, `true`).
 - `wheel`: `{ discretePaging, threshold, debounce, cooldown }` (defaults `true`, `100`, `120ms`, `800ms`) with aggressive dampening to avoid multi-item jumps.
@@ -91,28 +92,35 @@ Extends `SwipeDeckOptions<T>` plus:
 - `endReachedThreshold`: number of items from ends to trigger `onEndReached` (default `3`).
 - `onEndReached({ distanceFromEnd, direction })`: fires near start or end when within threshold.
 - `ariaLabel`: feed label (default `"Swipe feed"`).
-- `visibility`: reserved for future visibility strategies (currently unused).
-- `onItemActive`, `onItemInactive`: reserved hooks for future activation callbacks (currently no-ops).
+- `visibility`: `{ strategy, intersectionRatio, debounce }`; defaults to position-based activation. Intersection activation defaults to ratio `0.6` and falls back to position when `IntersectionObserver` is unavailable.
+- `onItemActive`, `onItemInactive`: exact active-item lifecycle callbacks, including initial mount and final unmount.
 
 ### Render context (children)
 
 - `item`: data item
 - `index`: item index
 - `isActive`: whether the item is the centered/active one
-- `props`: spread onto your item element (includes refs, transforms, snap styles, data attributes)
+- `shouldPreload`: whether the item is in the configured preload window
+- `props`: spread onto your item content (data and accessibility attributes; SwipeDeck's outer article owns its internal ref and positioning styles)
 
 ### Imperative handle (`SwipeDeckHandle`)
 
 - `prev()`, `next()`
 - `scrollTo(index, { behavior })`
 - `getState()`: `{ index, isAnimating, canPrev, canNext }`
+- `getMotion()`: latest `SwipeDeckMotion` snapshot
 
 ### `useSwipeDeck` return shape
 
 - State: `index`, `isAnimating`, `canPrev`, `canNext`, `items`, `orientation`
 - Actions: `prev()`, `next()`, `scrollTo(index, { behavior })`
+- Motion: `getMotion()` snapshot plus `onMotionChange` subscription
 - Layout: `virtualItems` (offset/size/key/measureElement), `totalSize`
 - Props helpers: `getViewportProps()`, `getItemProps(index)`
+
+## Continuous motion
+
+`onMotionChange` emits `{ scrollOffset, viewportSize, position, index, offset, offsetRatio, direction, isSettled }`. Use the fractional `position` and nearest-item `offset` to synchronize shared media or visual effects without reading the viewport DOM. The callback is throttled with `requestAnimationFrame`; keep per-pixel transforms imperative and copy only coarse state such as `motion.index` into React state.
 
 ### Helper hook
 
@@ -168,7 +176,7 @@ cd example
 bun run dev            # Vite dev server (default http://localhost:5173)
 ```
 
-The example demonstrates render-prop usage, global keyboard navigation, gesture swipe, mute toggle, and custom UI chrome.
+The example demonstrates render-prop usage, shared-player synchronization through `onMotionChange`, global keyboard navigation, gesture swipe, mute toggle, and custom UI chrome.
 
 ## Dev & test scripts (root)
 
@@ -191,5 +199,4 @@ The example demonstrates render-prop usage, global keyboard navigation, gesture 
 
 ## Status
 
-`visibility`, `onItemActive`, and `onItemInactive` options are present for future parity with the design spec but are not wired yet.
-
+Motion snapshots and intersection visibility require a viewport with a concrete size.

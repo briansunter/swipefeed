@@ -21,6 +21,8 @@ Headless React primitives for building TikTok/Reels-style swipe feeds. Ships a r
 - Virtualization via `@tanstack/react-virtual` with auto measurement and overscan tuning.
 - Input support: pointer drag/flick, discrete wheel paging with heavy dampening, keyboard (global or scoped).
 - Controlled or uncontrolled index, loopable navigation, programmatic `prev/next/scrollTo`.
+- Animation-frame-throttled motion snapshots for synchronized media and visual effects.
+- Position- or intersection-based activation with exact active/inactive lifecycle callbacks.
 - Accessibility-first: focusable `role="feed"` viewport, per-item `role="article"`, `aria-label`, `aria-busy`, snap alignment.
 - Reduced-motion aware (`prefers-reduced-motion` uses instant scrolling).
 - End-reached callbacks for infinite loading triggers.
@@ -97,9 +99,9 @@ function CustomLayout({ items }) {
 Extends `SwipeDeckOptions<T>` plus:
 
 - `as`: custom element/component for the viewport (default `"div"`).
-- `children(context)`: render prop; receives `{ item, index, isActive, props }`.
+- `children(context)`: render prop; receives `{ item, index, isActive, shouldPreload, props }`.
 - `className`, `style`: forwarded to the viewport.
-- `ref`: imperative handle (`SwipeDeckHandle`) with `prev`, `next`, `scrollTo`, `getState`.
+- `ref`: imperative handle (`SwipeDeckHandle`) with `prev`, `next`, `scrollTo`, `getState`, `getMotion`.
 
 ### `SwipeDeckOptions<T>`
 
@@ -108,7 +110,8 @@ Extends `SwipeDeckOptions<T>` plus:
 - `direction`: `"ltr"` (default) | `"rtl"` (affects horizontal gestures/wheel/keyboard).
 - `defaultIndex`: initial index for uncontrolled mode (default `0`).
 - `index`: controlled index. When set, you must manage updates via `onIndexChange`.
-- `onIndexChange(index, source)`: fires on any navigation. `source` is one of `"user:gesture" | "user:wheel" | "user:keyboard" | "programmatic" | "snap"`.
+- `onIndexChange(index, source)`: fires on any navigation. `source` is one of `"user:gesture" | "user:wheel" | "user:keyboard" | "programmatic" | "visibility" | "snap"`.
+- `onMotionChange(motion)`: animation-frame-throttled continuous motion callback. It does not put per-pixel motion into React render state.
 - `loop`: wrap navigation at ends (default `false`).
 - `gesture`: `{ threshold, flickVelocity, lockAxis, ignoreWhileAnimating }` (defaults `10`, `0.1`, `true`, `true`).
 - `wheel`: `{ discretePaging, threshold, debounce, cooldown }` (defaults `true`, `100`, `120ms`, `800ms`) with aggressive dampening to prevent multi-item jumps.
@@ -118,28 +121,37 @@ Extends `SwipeDeckOptions<T>` plus:
 - `endReachedThreshold`: number of items from ends to trigger `onEndReached` (default `3`).
 - `onEndReached({ distanceFromEnd, direction })`: called when within threshold from start or end.
 - `ariaLabel`: label for the feed (default `"Swipe feed"`).
-- `visibility`: reserved for future visibility strategies (currently unused).
-- `onItemActive`, `onItemInactive`: reserved hooks for future activation callbacks (currently no-ops).
+- `visibility`: `{ strategy, intersectionRatio, debounce }`. `strategy` defaults to `"position"`; `"intersection"` activates an item after it crosses `intersectionRatio` (default `0.6`) and falls back to position when `IntersectionObserver` is unavailable.
+- `onItemActive(item, index)`, `onItemInactive(item, index)`: exact lifecycle transitions for the active item. The initial item activates on mount and the final item becomes inactive on unmount.
 
 ### Render context (`children`)
 
 - `item`: the data item.
 - `index`: item index.
 - `isActive`: whether the item is currently centered/active.
-- `props`: spread onto your item element (includes refs, transforms, snap styles, data attributes).
+- `shouldPreload`: whether the item is in the configured forward/backward preload window.
+- `props`: spread onto your item content (data and accessibility attributes; SwipeDeck's outer article owns its internal ref and positioning styles).
 
 ### Imperative handle (`SwipeDeckHandle`)
 
 - `prev()`, `next()`
 - `scrollTo(index, { behavior })`
 - `getState()`: `{ index, isAnimating, canPrev, canNext }`
+- `getMotion()`: latest `SwipeDeckMotion` snapshot without subscribing React render state.
 
 ### `useSwipeDeck` return shape
 
 - State: `index`, `isAnimating`, `canPrev`, `canNext`, `items`, `orientation`.
 - Actions: `prev()`, `next()`, `scrollTo(index, { behavior })`.
+- Motion: `getMotion()` for the latest snapshot; use `onMotionChange` to subscribe.
 - Layout: `virtualItems` (offset/size/key/measureElement), `totalSize`.
 - Props helpers: `getViewportProps()`, `getItemProps(index)`.
+
+## Continuous motion
+
+`onMotionChange` emits `{ scrollOffset, viewportSize, position, index, offset, offsetRatio, direction, isSettled }`. `position` is fractional, while `index` is the nearest item. `offset` is the nearest item's pixel displacement from its settled position, which makes a shared media layer follow the outgoing and incoming cards without reading the viewport DOM directly.
+
+The callback is throttled with `requestAnimationFrame`. Keep high-frequency visual work imperative (for example, update a transform); only copy coarse changes such as `motion.index` into React state.
 
 ### Helper hook
 
@@ -181,7 +193,7 @@ cd example
 bun run dev            # starts Vite on http://localhost:5173
 ```
 
-Key bits: render prop usage, global keyboard navigation, gesture swipe, mute button overlay, and custom chrome.
+Key bits: render prop usage, shared-player synchronization through `onMotionChange`, global keyboard navigation, gesture swipe, mute button overlay, and custom chrome.
 
 ## Scripts (root)
 
@@ -206,5 +218,4 @@ Key bits: render prop usage, global keyboard navigation, gesture swipe, mute but
 
 ## Notes & limitations
 
-- `visibility`, `onItemActive`, and `onItemInactive` options are present for future parity with the design spec but are not wired yet.
-- Ensure your viewport has a defined size; virtualization and snap rely on it.
+- Ensure your viewport has a defined size; virtualization, motion snapshots, and snap rely on it.

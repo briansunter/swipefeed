@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { clamp } from "../utils/clamp";
 import { prefersReducedMotion } from "../utils/prefersReducedMotion";
+import { calculateSwipeDeckMotion, createInitialSwipeDeckMotion } from "../motion";
 import { useGestures } from "./useGestures";
 import { useWheel } from "./useWheel";
 import { useKeyboard } from "./useKeyboard";
@@ -71,6 +72,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const gestureCfg = useMemo(() => ({ ...DEFAULTS.gesture, ...(options.gesture ?? {}) }), [options.gesture]);
   const wheelCfg = useMemo(() => ({ ...DEFAULTS.wheel, ...(options.wheel ?? {}) }), [options.wheel]);
   const keyboardCfg = useMemo(() => ({ ...DEFAULTS.keyboard, ...(options.keyboard ?? {}) }), [options.keyboard]);
+  const visibilityCfg = useMemo(
+    () => ({ ...DEFAULTS.visibility, ...(options.visibility ?? {}) }),
+    [options.visibility],
+  );
   const virtualCfg = useMemo(() => {
     const base = { ...DEFAULTS.virtual, ...(options.virtual ?? {}) };
     // Ensure overscan is at least as large as preload + preloadPrevious to ensure all preloaded items are rendered
@@ -100,6 +105,14 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const navigationStartRef = useRef<number>(0); // Track when navigation started for safety timeout
   const lastNavigationIndexRef = useRef<number>(-1); // Prevent duplicate navigations to same index
   const lastNavigationTimeRef = useRef<number>(0); // Cooldown between navigations
+  const motionRef = useRef(createInitialSwipeDeckMotion(index));
+  const motionRafRef = useRef<number | null>(null);
+  const activeItemRef = useRef<{ item: T; index: number } | null>(null);
+  const itemElementsRef = useRef(new Map<number, HTMLElement>());
+  const itemRefCallbacksRef = useRef(new Map<number, React.RefCallback<HTMLElement>>());
+  const visibilityObserverRef = useRef<IntersectionObserver | null>(null);
+  const visibilityRatiosRef = useRef(new Map<number, number>());
+  const visibilityDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     // Clamp index when items change
@@ -156,6 +169,170 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     },
     []
   );
+
+  useEffect(() => {
+    const hasActiveItem = index >= 0 && index < items.length;
+    const nextActive = hasActiveItem ? { item: items[index] as T, index } : null;
+    const previousActive = activeItemRef.current;
+    const didChange = previousActive?.index !== nextActive?.index
+      || previousActive?.item !== nextActive?.item;
+
+    if (!didChange) return;
+    if (previousActive) {
+      latest.current.options.onItemInactive?.(previousActive.item, previousActive.index);
+    }
+    activeItemRef.current = nextActive;
+    if (nextActive) {
+      latest.current.options.onItemActive?.(nextActive.item, nextActive.index);
+    }
+  }, [index, items]);
+
+  useEffect(() => () => {
+    const activeItem = activeItemRef.current;
+    if (activeItem) {
+      latest.current.options.onItemInactive?.(activeItem.item, activeItem.index);
+      activeItemRef.current = null;
+    }
+  }, []);
+
+  const emitMotion = useCallback((
+    force = false,
+    geometry?: { orientation: Orientation; itemCount: number },
+  ) => {
+    const { viewport, orientation: currentOrientation, items, options } = latest.current;
+    if (!viewport) return;
+    const motionOrientation = geometry?.orientation ?? currentOrientation;
+    const itemCount = geometry?.itemCount ?? items.length;
+
+    const previousMotion = motionRef.current;
+    const nextMotion = calculateSwipeDeckMotion({
+      scrollOffset: motionOrientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft,
+      viewportSize: motionOrientation === "vertical" ? viewport.clientHeight : viewport.clientWidth,
+      itemCount,
+      previousScrollOffset: previousMotion.scrollOffset,
+      settleTolerance: SNAP_ALIGNMENT_TOLERANCE_PX,
+    });
+    motionRef.current = nextMotion;
+
+    const didChange = Object.keys(nextMotion).some((key) => {
+      const motionKey = key as keyof typeof nextMotion;
+      return nextMotion[motionKey] !== previousMotion[motionKey];
+    });
+    if (force || didChange) options.onMotionChange?.(nextMotion);
+  }, []);
+
+  const scheduleMotion = useCallback(() => {
+    if (motionRafRef.current !== null) return;
+    motionRafRef.current = -1;
+    const animationFrame = requestAnimationFrame(() => {
+      motionRafRef.current = null;
+      emitMotion();
+    });
+    // Synchronous requestAnimationFrame test doubles may run the callback
+    // before returning an id. Preserve the callback's cleared state in that case.
+    if (motionRafRef.current !== null) motionRafRef.current = animationFrame;
+  }, [emitMotion]);
+
+  useEffect(() => {
+    if (!viewport) return;
+    emitMotion(true, { orientation, itemCount: items.length });
+  }, [emitMotion, items.length, orientation, viewport]);
+
+  useEffect(() => () => {
+    if (motionRafRef.current !== null) cancelAnimationFrame(motionRafRef.current);
+  }, []);
+
+  const getItemRef = useCallback((itemIndex: number): React.RefCallback<HTMLElement> => {
+    const cached = itemRefCallbacksRef.current.get(itemIndex);
+    if (cached) return cached;
+
+    const callback: React.RefCallback<HTMLElement> = (element) => {
+      const previousElement = itemElementsRef.current.get(itemIndex);
+      if (previousElement && previousElement !== element) {
+        visibilityObserverRef.current?.unobserve(previousElement);
+      }
+
+      if (!element) {
+        itemElementsRef.current.delete(itemIndex);
+        visibilityRatiosRef.current.delete(itemIndex);
+        return;
+      }
+
+      itemElementsRef.current.set(itemIndex, element);
+      visibilityObserverRef.current?.observe(element);
+    };
+    itemRefCallbacksRef.current.set(itemIndex, callback);
+    return callback;
+  }, []);
+
+  useEffect(() => {
+    if (
+      !viewport
+      || visibilityCfg.strategy !== "intersection"
+      || typeof IntersectionObserver === "undefined"
+    ) return;
+
+    const intersectionRatio = clamp(visibilityCfg.intersectionRatio, 0, 1);
+    const debounce = Math.max(0, visibilityCfg.debounce);
+
+    const commitVisibleIndex = () => {
+      visibilityDebounceRef.current = null;
+      const currentIndex = latest.current.index;
+      let nextIndex = -1;
+      let nextRatio = -1;
+
+      for (const [itemIndex, ratio] of visibilityRatiosRef.current) {
+        const isBetterRatio = ratio > nextRatio;
+        const isCloserTie = ratio === nextRatio
+          && Math.abs(itemIndex - currentIndex) < Math.abs(nextIndex - currentIndex);
+        if (ratio >= intersectionRatio && (isBetterRatio || isCloserTie)) {
+          nextIndex = itemIndex;
+          nextRatio = ratio;
+        }
+      }
+
+      if (nextIndex < 0 || nextIndex === latest.current.index) return;
+      sourceRef.current = "visibility";
+      applyIndexChange(nextIndex);
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        const itemIndex = Number((entry.target as HTMLElement).dataset.index);
+        if (!Number.isInteger(itemIndex)) continue;
+        visibilityRatiosRef.current.set(
+          itemIndex,
+          entry.isIntersecting ? entry.intersectionRatio : 0,
+        );
+      }
+
+      if (visibilityDebounceRef.current) clearTimeout(visibilityDebounceRef.current);
+      if (debounce === 0) commitVisibleIndex();
+      else visibilityDebounceRef.current = setTimeout(commitVisibleIndex, debounce);
+    }, {
+      root: viewport,
+      threshold: Array.from(new Set([0, intersectionRatio, 1])),
+    });
+
+    visibilityObserverRef.current = observer;
+    for (const element of itemElementsRef.current.values()) observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+      if (visibilityObserverRef.current === observer) visibilityObserverRef.current = null;
+      visibilityRatiosRef.current.clear();
+      if (visibilityDebounceRef.current) {
+        clearTimeout(visibilityDebounceRef.current);
+        visibilityDebounceRef.current = null;
+      }
+    };
+  }, [
+    applyIndexChange,
+    viewport,
+    visibilityCfg.debounce,
+    visibilityCfg.intersectionRatio,
+    visibilityCfg.strategy,
+  ]);
 
 
   const navigateTo = useCallback(
@@ -359,6 +536,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const scrollEndTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleScroll = useCallback(() => {
+    scheduleMotion();
+
     // Safety: Force unlock if navigation has been stuck for too long
     if (isNavigatingRef.current && Date.now() - navigationStartRef.current > NAVIGATION_LOCK_TIMEOUT_MS) {
       isNavigatingRef.current = false;
@@ -400,8 +579,12 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Double-check we're not navigating
       if (isNavigatingRef.current) return;
 
-      const { viewport, orientation, items } = latest.current;
+      const { viewport, orientation, items, options } = latest.current;
       if (!viewport) return;
+
+      const intersectionVisibilityAvailable = options.visibility?.strategy === "intersection"
+        && typeof IntersectionObserver !== "undefined";
+      if (intersectionVisibilityAvailable) return;
 
       const scrollOffset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
       const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
@@ -414,7 +597,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         applyIndexChange(newIndex);
       }
     });
-  }, [applyIndexChange]); // applyIndexChange is stable now
+  }, [applyIndexChange, scheduleMotion]);
 
   // onEndReached
   useEffect(() => {
@@ -428,18 +611,6 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       options.onEndReached?.({ distanceFromEnd: index, direction: "backward" });
     }
   }, [endReachedThreshold, index, items.length, options]);
-
-  const scrollBehavior = useMemo(
-    () => (prefersReducedMotion() ? "instant" : "smooth"),
-    [],
-  );
-
-  const scrollTo = useCallback(
-    (target: number, opts?: { behavior?: ScrollBehavior }) => {
-      navigateTo(target, "programmatic", opts?.behavior ?? scrollBehavior);
-    },
-    [navigateTo, scrollBehavior],
-  );
 
   const apiState: SwipeDeckState = useMemo(
     () => ({
@@ -463,6 +634,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     if (!viewport) return;
 
     const handleResize = () => {
+      scheduleMotion();
+
       // Clear any pending correction
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
@@ -485,6 +658,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
             viewport.scrollLeft = targetScroll;
           }
         }
+        emitMotion();
       }, RESIZE_CORRECTION_DEBOUNCE_MS);
     };
 
@@ -497,7 +671,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         clearTimeout(resizeTimeoutRef.current);
       }
     };
-  }, [viewport]);
+  }, [emitMotion, scheduleMotion, viewport]);
 
   // Re-enable scroll-snap when user touches the screen
   const handleTouchStart = useCallback(() => {
@@ -542,7 +716,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       const sizeUnit = orientation === 'vertical' ? '100dvh' : '100dvw';
 
       return {
-        ref: undefined,
+        ref: getItemRef(itemIndex),
         "data-index": itemIndex,
         "data-active": isActive,
         style: {
@@ -562,11 +736,12 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         } satisfies React.CSSProperties,
       };
     },
-    [index, orientation],
+    [getItemRef, index, orientation],
   );
 
   const prev = useCallback(() => navigateTo(latest.current.index - 1, "programmatic"), [navigateTo]);
   const next = useCallback(() => navigateTo(latest.current.index + 1, "programmatic"), [navigateTo]);
+  const getMotion = useCallback(() => motionRef.current, []);
 
   const api: SwipeDeckAPI<T> = useMemo(() => ({
     ...apiState,
@@ -580,7 +755,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     items,
     orientation,
     viewport,
-  }), [apiState, prev, next, navigateTo, getViewportProps, getItemProps, virtualizer.virtualItems, virtualizer.totalSize, items, orientation, viewport]);
+    getMotion,
+  }), [apiState, prev, next, navigateTo, getViewportProps, getItemProps, virtualizer.virtualItems, virtualizer.totalSize, items, orientation, viewport, getMotion]);
 
   return api;
 }

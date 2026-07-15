@@ -12,12 +12,17 @@ export type {
   SwipeDeckProps,
   SwipeDeckHandle,
   SwipeDeckRenderContext,
+  SwipeDeckMotion,
+  SwipeDeckMotionDirection,
+  GestureConfig,
+  WheelConfig,
+  KeyboardConfig,
+  VisibilityConfig,
+  VirtualConfig,
   IndexChangeSource,
   Orientation,
 
   Direction,
   ScrollBehavior,
 } from "./types";
-
-
 

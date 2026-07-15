@@ -9,7 +9,29 @@ export type IndexChangeSource =
   | "user:wheel"
   | "user:keyboard"
   | "programmatic"
+  | "visibility"
   | "snap";
+
+export type SwipeDeckMotionDirection = "forward" | "backward" | "none";
+
+export interface SwipeDeckMotion {
+  /** Clamped scroll offset along the deck's active axis, in pixels. */
+  scrollOffset: number;
+  /** Current viewport size along the deck's active axis, in pixels. */
+  viewportSize: number;
+  /** Continuous item position. For example, 1.5 is halfway from item 1 to item 2. */
+  position: number;
+  /** Item nearest the viewport center. */
+  index: number;
+  /** Nearest item's offset from its settled position, in pixels. */
+  offset: number;
+  /** Nearest item's offset normalized by viewport size. */
+  offsetRatio: number;
+  /** Direction of the latest observed movement. */
+  direction: SwipeDeckMotionDirection;
+  /** Whether the nearest item is aligned with the viewport. */
+  isSettled: boolean;
+}
 
 export interface GestureConfig {
   threshold?: number;
@@ -57,6 +79,11 @@ export interface SwipeDeckOptions<T> {
   defaultIndex?: number;
   index?: number;
   onIndexChange?: (index: number, source: IndexChangeSource) => void;
+  /**
+   * Receives requestAnimationFrame-throttled motion snapshots without making
+   * continuous motion part of SwipeDeck's React render state.
+   */
+  onMotionChange?: (motion: SwipeDeckMotion) => void;
   loop?: boolean;
   preload?: number; // Number of items to preload next
   preloadPrevious?: number; // Number of items to keep preloaded from previous
@@ -108,6 +135,7 @@ export interface SwipeDeckAPI<T> extends SwipeDeckState, SwipeDeckActions {
   items: readonly T[];
   orientation: Orientation;
   viewport: HTMLElement | null;
+  getMotion: () => SwipeDeckMotion;
 }
 
 export interface SwipeDeckRenderContext<T> {
@@ -132,6 +160,6 @@ export interface SwipeDeckProps<T> extends SwipeDeckOptions<T> {
 
 export interface SwipeDeckHandle extends SwipeDeckActions {
   getState: () => SwipeDeckState;
+  getMotion: () => SwipeDeckMotion;
   viewport: HTMLElement | null;
 }
-

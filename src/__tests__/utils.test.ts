@@ -104,8 +104,6 @@ describe("debounce", () => {
 });
 
 describe("prefersReducedMotion", () => {
-    // Note: prefersReducedMotion caches the result, so we can only test once per module load
-    // In tests, we can re-import by testing what's already cached
     it("returns a boolean", () => {
         const result = prefersReducedMotion();
         expect(typeof result).toBe("boolean");
@@ -115,6 +113,48 @@ describe("prefersReducedMotion", () => {
         const result1 = prefersReducedMotion();
         const result2 = prefersReducedMotion();
         expect(result1).toBe(result2);
+    });
+
+    it("tracks matchMedia changes in a fresh module", async () => {
+        vi.resetModules();
+        const originalMatchMedia = window.matchMedia;
+        let changeListener: ((event: MediaQueryListEvent) => void) | undefined;
+        window.matchMedia = vi.fn(() => ({
+            matches: true,
+            media: "(prefers-reduced-motion: reduce)",
+            onchange: null,
+            addEventListener: (_type: string, listener: EventListenerOrEventListenerObject) => {
+                changeListener = listener as (event: MediaQueryListEvent) => void;
+            },
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        }));
+
+        const fresh = await import("../utils/prefersReducedMotion");
+        expect(fresh.prefersReducedMotion()).toBe(true);
+        changeListener?.({ matches: false } as MediaQueryListEvent);
+        expect(fresh.prefersReducedMotion()).toBe(false);
+
+        window.matchMedia = originalMatchMedia;
+    });
+
+    it("falls back when matchMedia is unavailable", async () => {
+        vi.resetModules();
+        const originalMatchMedia = window.matchMedia;
+        Object.defineProperty(window, "matchMedia", {
+            configurable: true,
+            value: undefined,
+        });
+
+        const fresh = await import("../utils/prefersReducedMotion");
+        expect(fresh.prefersReducedMotion()).toBe(false);
+
+        Object.defineProperty(window, "matchMedia", {
+            configurable: true,
+            value: originalMatchMedia,
+        });
     });
 });
 

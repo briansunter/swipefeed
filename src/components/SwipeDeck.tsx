@@ -25,6 +25,7 @@ export function SwipeDeck<T>(
       prev: deck.prev,
       next: deck.next,
       scrollTo: deck.scrollTo,
+      getMotion: deck.getMotion,
       getState: () => ({
         index: deck.index,
         isAnimating: deck.isAnimating,
@@ -113,7 +114,11 @@ export function SwipeDeck<T>(
 
           // Don't pass style to children - the article wrapper already handles positioning
           // Children should use inset: 0 to fill the parent
-          const { style: _positioningStyle, ...propsWithoutStyle } = itemProps;
+          const {
+            style: _positioningStyle,
+            ref: _internalItemRef,
+            ...propsWithoutStyle
+          } = itemProps;
 
           const contextValue = {
             item,
@@ -142,4 +147,3 @@ export function SwipeDeck<T>(
     </Comp>
   );
 }
-

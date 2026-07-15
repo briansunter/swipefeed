@@ -1,8 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SwipeDeck, type IndexChangeSource, type SwipeDeckHandle } from "../src";
+import { SwipeDeck, type IndexChangeSource, type SwipeDeckMotion } from "../src";
 import "./index.css";
-import { getPlayerMotion } from "./playerMotion";
 import {
   getYouTubeEmbedUrl,
   parseYouTubePlayerMessage,
@@ -354,7 +353,6 @@ export function App() {
   const [playingIndex, setPlayingIndex] = useState(0);
   const [readyVideoId, setReadyVideoId] = useState<string | null>(null);
   const playerControllerRef = useRef<PlayerAudioController | null>(null);
-  const deckRef = useRef<SwipeDeckHandle>(null);
   const playerContainerRef = useRef<HTMLDivElement>(null);
 
   const registerPlayer = useCallback<RegisterPlayer>((controller) => {
@@ -383,42 +381,11 @@ export function App() {
     });
   }, []);
 
-  useEffect(() => {
-    let viewport: HTMLElement | null = null;
-    let animationFrame = 0;
-
-    const syncPlayerPosition = () => {
-      if (!viewport || !playerContainerRef.current) return;
-      const { index, offset } = getPlayerMotion(
-        viewport.scrollTop,
-        viewport.clientHeight || window.innerHeight,
-        items.length,
-      );
-      setPlayingIndex((current) => current === index ? current : index);
-      playerContainerRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
-    };
-
-    const attach = () => {
-      viewport = deckRef.current?.viewport ?? null;
-      if (!viewport) {
-        animationFrame = requestAnimationFrame(attach);
-        return;
-      }
-
-      syncPlayerPosition();
-      viewport.addEventListener("scroll", syncPlayerPosition, { passive: true });
-      window.addEventListener("resize", syncPlayerPosition);
-      window.addEventListener("orientationchange", syncPlayerPosition);
-    };
-
-    attach();
-
-    return () => {
-      cancelAnimationFrame(animationFrame);
-      viewport?.removeEventListener("scroll", syncPlayerPosition);
-      window.removeEventListener("resize", syncPlayerPosition);
-      window.removeEventListener("orientationchange", syncPlayerPosition);
-    };
+  const handleMotionChange = useCallback((motion: SwipeDeckMotion) => {
+    setPlayingIndex((current) => current === motion.index ? current : motion.index);
+    if (playerContainerRef.current) {
+      playerContainerRef.current.style.transform = `translate3d(0, ${motion.offset}px, 0)`;
+    }
   }, []);
 
   return (
@@ -437,10 +404,10 @@ export function App() {
         <Header />
         <div className="w-full h-full">
           <SwipeDeck
-            ref={deckRef}
             items={items}
             index={activeIndex}
             onIndexChange={handleIndexChange}
+            onMotionChange={handleMotionChange}
             className="w-full h-full overflow-y-auto overflow-x-hidden relative scrollbar-none"
             gesture={{ ignoreWhileAnimating: false }}
             keyboard={{ global: true }}
