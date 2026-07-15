@@ -1,8 +1,16 @@
 import { createRoot } from "react-dom/client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { SwipeDeck, type IndexChangeSource } from "../src";
+import { SwipeDeck, type IndexChangeSource, type SwipeDeckHandle } from "../src";
 import "./index.css";
-import { sendYouTubeCommand, syncYouTubePlayback } from "./youtubePlayerCommands";
+import { getPlayerMotion } from "./playerMotion";
+import {
+  getYouTubeEmbedUrl,
+  parseYouTubePlayerMessage,
+  sendYouTubeCommand,
+  shouldRetryYouTubePlayback,
+  syncYouTubePlayback,
+} from "./youtubePlayerCommands";
+import { YOUTUBE_IDS } from "./videoCatalog";
 
 // --- Icons ---
 import HomeOutline from "./icons/home-outline.svg";
@@ -36,40 +44,10 @@ type VideoItem = {
   color: string;
 };
 
-type PlayerAudioController = (isMuted: boolean) => void;
-type RegisterPlayer = (index: number, controller: PlayerAudioController) => () => void;
+export type PlayerAudioController = (isMuted: boolean) => boolean;
+type RegisterPlayer = (controller: PlayerAudioController) => () => void;
 
 const COLOR_PALETTE = ["#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#2196F3"];
-
-const YOUTUBE_IDS = [
-  "x2BwY40EYp8",
-  "tUiFUJFQZKo",
-  "gcPJH-qQ7To",
-  "qK38nPgaQ2U",
-  "TcIjPPrwX4U",
-  "LCqBUv5TJ0U",
-  "6Wk_rydOz6Y",
-  "Wi_f2dR9Frg",
-  "EEGJMnqHT7Q",
-  "jUvgToe3pNE",
-  "1C-StoezvXQ",
-  "nanZ2ZFE5RM",
-  "k70PAc_qsi8",
-  "37F_-KvfC68",
-  "RNJhm72AEnI",
-  "ga66siYwX7U",
-  "Jb3XHHcmFlw",
-  "6jCmv1sACVU",
-  "HpaNtWOLfpA",
-  "7R1H-3yCgdY",
-  "6ydY6k-BGk0",
-  "RlBE1zuXseE",
-  "FiYWmBdBhxs",
-  "ZHk8w8fCy2I",
-  "oJ6mC4DsOM4",
-  "GDcdFtZExzM",
-  "dDHPkaJXHQg",
-];
 
 const items: VideoItem[] = YOUTUBE_IDS.map((youtubeId, i) => ({
   id: `video-${i + 1}`,
@@ -149,111 +127,138 @@ const BottomNav = () => (
   </nav>
 );
 
-const YouTubePlayer = ({ index, youtubeId, isActive, isMuted, shouldPreload, registerPlayer }: { index: number; youtubeId: string; isActive: boolean; isMuted: boolean; shouldPreload?: boolean; registerPlayer: RegisterPlayer }) => {
+export const YouTubePlayer = ({ youtubeId, isMuted, registerPlayer }: { youtubeId: string; isMuted: boolean; registerPlayer: RegisterPlayer }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
-  const lastAppliedMutedRef = useRef<boolean | null>(null);
-  const needsActivationRef = useRef(true);
-  const shouldRender = isActive || shouldPreload;
+  const [isApiReady, setIsApiReady] = useState(false);
+  const [playerState, setPlayerState] = useState<number | null>(null);
+  const [playerError, setPlayerError] = useState<number | null>(null);
+  const initialVideoIdRef = useRef(youtubeId);
+  const currentVideoIdRef = useRef(youtubeId);
+  const audioAppliedToVideoRef = useRef<string | null>(null);
+  const lastCommandTimeRef = useRef(0);
+  const commandTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>());
+
+  const sendCommand = useCallback((command: Parameters<typeof sendYouTubeCommand>[1], args: unknown[] = []) => {
+    const delay = Math.max(0, 50 - (Date.now() - lastCommandTimeRef.current));
+    const timer = setTimeout(() => {
+      commandTimersRef.current.delete(timer);
+      const playerWindow = iframeRef.current?.contentWindow;
+      if (!playerWindow) return;
+      sendYouTubeCommand(playerWindow, command, args);
+      lastCommandTimeRef.current = Date.now();
+    }, delay);
+    commandTimersRef.current.add(timer);
+  }, []);
 
   const applyAudioState = useCallback((nextMuted: boolean) => {
     const playerWindow = iframeRef.current?.contentWindow;
-    if (!playerWindow) return;
+    if (!playerWindow || !isApiReady || playerError !== null) return false;
 
-    syncYouTubePlayback(playerWindow, { isMuted: nextMuted, shouldPlay: true });
-    lastAppliedMutedRef.current = nextMuted;
-    needsActivationRef.current = false;
-  }, []);
+    syncYouTubePlayback(playerWindow, { isMuted: nextMuted, shouldPlay: !nextMuted });
+    if (nextMuted) audioAppliedToVideoRef.current = null;
+    return true;
+  }, [isApiReady, playerError]);
 
   useEffect(() => {
-    if (!shouldRender) return;
-    return registerPlayer(index, applyAudioState);
-  }, [applyAudioState, index, registerPlayer, shouldRender]);
+    return registerPlayer(applyAudioState);
+  }, [applyAudioState, registerPlayer]);
 
-  // Reset video ready state when becoming inactive (and not preloading)
   useEffect(() => {
-    if (!shouldRender) {
-      setIsVideoReady(false);
-      lastAppliedMutedRef.current = null;
-      needsActivationRef.current = true;
-    }
-  }, [shouldRender]);
-
-  // Listen for YouTube API messages
-  useEffect(() => {
-    if (!shouldRender) return;
-
     const handleMessage = (event: MessageEvent) => {
+      if (!iframeRef.current || event.source !== iframeRef.current.contentWindow) return;
       if (event.origin !== "https://www.youtube.com") return;
+
       try {
-        const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
+        const update = parseYouTubePlayerMessage(event.data);
+        if (!update) return;
 
-        if (data.event === "onReady" || data.event === "onStateChange" || (data.event === "infoDelivery" && data.info)) {
-          setIsVideoReady(true);
-        }
-
-        // Auto-pause if preloading and video starts playing
-        if (data.event === "onStateChange" && data.info === 1) { // 1 = Playing
-          if (shouldPreload && !isActive) {
-            const playerWindow = iframeRef.current?.contentWindow;
-            if (playerWindow) sendYouTubeCommand(playerWindow, "pauseVideo");
-          }
+        setIsApiReady(true);
+        if (update.type === "state") {
+          setPlayerState(update.state);
+          if (update.state === 1) setIsVideoReady(true);
+        } else if (update.type === "error") {
+          setPlayerError(update.code);
+          setPlayerState(null);
+          setIsVideoReady(false);
         }
       } catch {
-        // Ignore non-JSON messages
+        // Ignore non-JSON messages from the player.
       }
     };
 
     window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, [shouldRender, shouldPreload, isActive]);
 
-  // Fallback: show video after timeout if no API message received
+    return () => {
+      window.removeEventListener("message", handleMessage);
+      for (const timer of commandTimersRef.current) clearTimeout(timer);
+      commandTimersRef.current.clear();
+    };
+  }, []);
+
   useEffect(() => {
-    if (!shouldRender) return;
-    const timeout = setTimeout(() => setIsVideoReady(true), 2000);
-    return () => clearTimeout(timeout);
-  }, [shouldRender]);
+    if (!isApiReady) return;
+    iframeRef.current?.contentWindow?.postMessage(
+      JSON.stringify({ event: "listening" }),
+      "https://www.youtube.com",
+    );
+  }, [isApiReady]);
 
-  // Control mute/play state
   useEffect(() => {
-    if (!iframeRef.current || !isVideoReady) return;
+    if (!isApiReady || currentVideoIdRef.current === youtubeId) return;
+    currentVideoIdRef.current = youtubeId;
+    audioAppliedToVideoRef.current = null;
+    setPlayerState(null);
+    setPlayerError(null);
+    setIsVideoReady(false);
+    sendCommand("loadVideoById", [youtubeId]);
+  }, [isApiReady, sendCommand, youtubeId]);
 
-    const playerWindow = iframeRef.current.contentWindow;
-    if (!playerWindow) return;
+  useEffect(() => {
+    if (!shouldRetryYouTubePlayback({ isApiReady, playerState, playerError })) return;
+    const timer = setTimeout(() => sendCommand("playVideo"), 800);
+    return () => clearTimeout(timer);
+  }, [isApiReady, playerError, playerState, sendCommand]);
 
-    if (isActive) {
-      if (needsActivationRef.current || lastAppliedMutedRef.current !== isMuted) {
-        syncYouTubePlayback(playerWindow, { isMuted, shouldPlay: true });
-        lastAppliedMutedRef.current = isMuted;
-      }
-      needsActivationRef.current = false;
-    } else if (shouldPreload) {
-      // Setup for preloading (muted)
-      syncYouTubePlayback(playerWindow, { isMuted: true, shouldPlay: false });
-      lastAppliedMutedRef.current = true;
-      needsActivationRef.current = true;
-      // We rely on autoplay=1 to start, then the message listener pauses it
+  useEffect(() => {
+    if (!isApiReady || playerError !== null) return;
+
+    if (isMuted) {
+      sendCommand("mute");
+      audioAppliedToVideoRef.current = null;
+    } else if (playerState === 1 && audioAppliedToVideoRef.current !== youtubeId) {
+      sendCommand("unMute");
+      sendCommand("setVolume", [100]);
+      audioAppliedToVideoRef.current = youtubeId;
     }
-  }, [isMuted, isVideoReady, isActive, shouldPreload]);
+  }, [isApiReady, isMuted, playerError, playerState, sendCommand, youtubeId]);
+
+  const isCurrentVideoReady = isVideoReady && currentVideoIdRef.current === youtubeId;
+  const isCurrentVideoFailed = playerError !== null && currentVideoIdRef.current === youtubeId;
 
   return (
-    <div className="youtube-player-wrapper w-full h-full relative overflow-hidden bg-black">
-      {/* Render iframe if active OR preloading */}
-      {shouldRender && (
-        <iframe
-          ref={iframeRef}
-          src={`https://www.youtube.com/embed/${youtubeId}?enablejsapi=1&autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&showinfo=0&loop=1&playlist=${youtubeId}&playsinline=1&origin=${encodeURIComponent(window.location.origin)}`}
-          // Keep opacity 0 if not active (so preloader is hidden)
-          className={`w-full h-full object-cover transition-opacity duration-500 ease-in scale-125 origin-center pointer-events-none ${(isVideoReady && isActive) ? 'opacity-100' : 'opacity-0'}`}
-          title="YouTube video player"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          allowFullScreen
-        />
-      )}
-      {/* Thumbnail - hide when Active AND Ready */}
-      <div className={`absolute inset-0 bg-black transition-opacity duration-500 ease-out pointer-events-none ${(isActive && isVideoReady) ? 'opacity-0' : 'opacity-100'}`}>
+    <div
+      data-testid="youtube-player"
+      data-youtube-id={youtubeId}
+      data-loaded-youtube-id={currentVideoIdRef.current}
+      data-player-state={playerState ?? ""}
+      data-player-error={playerError ?? ""}
+      className="youtube-player-wrapper w-full h-full relative overflow-hidden bg-black"
+    >
+      <iframe
+        ref={iframeRef}
+        onLoad={() => {
+          setIsVideoReady(true);
+          setIsApiReady(true);
+        }}
+        src={getYouTubeEmbedUrl(initialVideoIdRef.current)}
+        className={`w-full h-full object-cover transition-opacity duration-300 ease-in scale-125 origin-center pointer-events-none ${isCurrentVideoReady ? 'opacity-100' : 'opacity-0'}`}
+        title="YouTube video player"
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+      />
+      <div className={`absolute inset-0 bg-black transition-opacity duration-300 ease-out pointer-events-none ${isCurrentVideoReady ? 'opacity-0' : 'opacity-100'}`}>
         <img
           src={`https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg`}
           alt="Cover"
@@ -262,10 +267,15 @@ const YouTubePlayer = ({ index, youtubeId, isActive, isMuted, shouldPreload, reg
             (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg`;
           }}
         />
-        {/* Only show spinner when active and loading (not when preloading) */}
-        {isActive && !isVideoReady && (
+        {!isCurrentVideoReady && (
           <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+            {isCurrentVideoFailed ? (
+              <output className="block rounded-full bg-black/60 px-4 py-2 text-sm font-semibold text-white">
+                Video unavailable — swipe to continue
+              </output>
+            ) : (
+              <div data-testid="youtube-loading-spinner" className="w-12 h-12 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+            )}
           </div>
         )}
       </div>
@@ -302,9 +312,18 @@ const VideoSidebar = ({ item }: { item: VideoItem }) => (
   </div>
 );
 
-const VideoCard = ({ index, item, isActive, isMuted, shouldPreload, registerPlayer }: { index: number; item: VideoItem; isActive: boolean; isMuted: boolean; shouldPreload?: boolean; registerPlayer: RegisterPlayer }) => (
-  <div className="w-full h-full relative overflow-hidden" style={{ background: `linear-gradient(180deg, ${item.color} 0%, #000 120%)` }}>
-    <YouTubePlayer index={index} youtubeId={item.youtubeId} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} registerPlayer={registerPlayer} />
+export const VideoCard = ({ item, isPlaying }: { item: VideoItem; isPlaying: boolean }) => (
+  <div data-testid={`video-card-${item.id}`} className="w-full h-full relative overflow-hidden">
+    <div data-testid={`video-poster-${item.id}`} className={`absolute inset-0 bg-black pointer-events-none transition-opacity duration-150 ease-linear ${isPlaying ? 'opacity-0' : 'opacity-100'}`}>
+      <img
+        src={`https://img.youtube.com/vi/${item.youtubeId}/maxresdefault.jpg`}
+        alt={`Preview for ${item.description}`}
+        className="w-full h-full object-cover scale-125 origin-center"
+        onError={(e) => {
+          (e.target as HTMLImageElement).src = `https://img.youtube.com/vi/${item.youtubeId}/hqdefault.jpg`;
+        }}
+      />
+    </div>
     <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 20%, transparent 70%, rgba(0,0,0,0.8) 100%)' }} />
     <div className="absolute inset-0 flex flex-col justify-end pb-[48px] pointer-events-none">
       <div className="flex justify-between w-full pointer-events-auto items-end pb-2">
@@ -315,42 +334,83 @@ const VideoCard = ({ index, item, isActive, isMuted, shouldPreload, registerPlay
   </div>
 );
 
-function App() {
+export function App() {
   const [isMuted, setIsMuted] = useState(true);
   const [activeIndex, setActiveIndex] = useState(0);
-  const playerControllersRef = useRef(new Map<number, PlayerAudioController>());
+  const [playingIndex, setPlayingIndex] = useState(0);
+  const playerControllerRef = useRef<PlayerAudioController | null>(null);
+  const deckRef = useRef<SwipeDeckHandle>(null);
+  const playerContainerRef = useRef<HTMLDivElement>(null);
 
-  const registerPlayer = useCallback<RegisterPlayer>((index, controller) => {
-    playerControllersRef.current.set(index, controller);
+  const registerPlayer = useCallback<RegisterPlayer>((controller) => {
+    playerControllerRef.current = controller;
 
     return () => {
-      if (playerControllersRef.current.get(index) === controller) {
-        playerControllersRef.current.delete(index);
-      }
+      if (playerControllerRef.current === controller) playerControllerRef.current = null;
     };
   }, []);
 
   const toggleMute = useCallback(() => {
     const nextMuted = !isMuted;
-    playerControllersRef.current.get(activeIndex)?.(nextMuted);
+    const didApply = playerControllerRef.current?.(nextMuted);
+    if (!didApply) return;
     setIsMuted(nextMuted);
-  }, [activeIndex, isMuted]);
-
-  const handleIndexChange = useCallback((nextIndex: number, source: IndexChangeSource) => {
-    if (!isMuted && source.startsWith("user:")) {
-      playerControllersRef.current.get(nextIndex)?.(false);
-    }
-    setActiveIndex(nextIndex);
   }, [isMuted]);
+
+  const handleIndexChange = useCallback((nextIndex: number, _source: IndexChangeSource) => {
+    setActiveIndex(nextIndex);
+  }, []);
+
+  useEffect(() => {
+    let viewport: HTMLElement | null = null;
+    let animationFrame = 0;
+
+    const syncPlayerPosition = () => {
+      if (!viewport || !playerContainerRef.current) return;
+      const { index, offset } = getPlayerMotion(
+        viewport.scrollTop,
+        viewport.clientHeight || window.innerHeight,
+        items.length,
+      );
+      setPlayingIndex((current) => current === index ? current : index);
+      playerContainerRef.current.style.transform = `translate3d(0, ${offset}px, 0)`;
+    };
+
+    const attach = () => {
+      viewport = deckRef.current?.viewport ?? null;
+      if (!viewport) {
+        animationFrame = requestAnimationFrame(attach);
+        return;
+      }
+
+      syncPlayerPosition();
+      viewport.addEventListener("scroll", syncPlayerPosition, { passive: true });
+      window.addEventListener("resize", syncPlayerPosition);
+      window.addEventListener("orientationchange", syncPlayerPosition);
+    };
+
+    attach();
+
+    return () => {
+      cancelAnimationFrame(animationFrame);
+      viewport?.removeEventListener("scroll", syncPlayerPosition);
+      window.removeEventListener("resize", syncPlayerPosition);
+      window.removeEventListener("orientationchange", syncPlayerPosition);
+    };
+  }, []);
 
   return (
     <div className="w-full h-full bg-black flex justify-center">
       {/* Constrain to mobile-like width on desktop */}
       <main className="w-full max-w-[430px] h-full relative text-white bg-black">
+        <div data-testid="shared-youtube-player" ref={playerContainerRef} className="absolute inset-0 z-0 will-change-transform">
+          <YouTubePlayer youtubeId={items[playingIndex].youtubeId} isMuted={isMuted} registerPlayer={registerPlayer} />
+        </div>
         <MuteButton isMuted={isMuted} toggleMute={toggleMute} />
         <Header />
         <div className="w-full h-full">
           <SwipeDeck
+            ref={deckRef}
             items={items}
             index={activeIndex}
             onIndexChange={handleIndexChange}
@@ -361,7 +421,7 @@ function App() {
             preload={2} // Preload the next 2 videos
             preloadPrevious={1} // Keep the previous video preloaded
           >
-            {({ item, index, isActive, shouldPreload }) => <VideoCard index={index} item={item} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} registerPlayer={registerPlayer} />}
+            {({ item, index }) => <VideoCard item={item} isPlaying={index === playingIndex} />}
           </SwipeDeck>
         </div>
         <BottomNav />

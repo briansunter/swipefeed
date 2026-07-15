@@ -192,6 +192,7 @@ Key bits: render prop usage, global keyboard navigation, gesture swipe, mute but
 - `bun run site:prepare` – rebuild docs+example into `site/` for GitHub Pages.
 - `bun run test` – Vitest (jsdom) unit suite.
 - `bun run test:browser` – Vitest browser runner (wheel/scroll integration).
+- `bun run test:example:live -- http://127.0.0.1:<port>/` – against an already-running example, verify every catalog video is embeddable, portrait, playing after unmute, and loaded through one stable iframe. Choose an unused local port; this network-dependent release check is intentionally separate from deterministic CI.
 - `bun run test:coverage`, `bun run test:browser:coverage`, `bun run coverage:merge` – coverage reports/merge.
 - `bun run lint` / `bun run format` – Biome lint/format.
 - `bun run typecheck` – TypeScript.

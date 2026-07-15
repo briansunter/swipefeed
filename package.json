@@ -43,6 +43,7 @@
     "test": "vitest run --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:coverage": "vitest run --coverage --environment jsdom --exclude src/__tests__/**/*browser.*",
     "test:browser": "vitest run --config vitest.browser.config.ts",
+    "test:example:live": "bun scripts/check-example-videos.ts",
     "test:browser:coverage": "vitest run --config vitest.browser.config.ts --coverage",
     "test:coverage:all": "npm run test:coverage && npm run test:browser:coverage && npm run coverage:merge",
     "coverage:merge": "mkdir -p coverage/merged && nyc merge coverage/unit coverage/merged/unit.json && nyc merge coverage/browser coverage/merged/browser.json && nyc merge coverage/merged coverage/merged/final.json && nyc report --reporter=text --reporter=lcov --temp-dir=coverage/merged",
