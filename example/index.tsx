@@ -1,7 +1,8 @@
 import { createRoot } from "react-dom/client";
-import { useState, useEffect, useRef } from "react";
-import { SwipeDeck } from "../src";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SwipeDeck, type IndexChangeSource } from "../src";
 import "./index.css";
+import { sendYouTubeCommand, syncYouTubePlayback } from "./youtubePlayerCommands";
 
 // --- Icons ---
 import HomeOutline from "./icons/home-outline.svg";
@@ -34,6 +35,9 @@ type VideoItem = {
   shares: string;
   color: string;
 };
+
+type PlayerAudioController = (isMuted: boolean) => void;
+type RegisterPlayer = (index: number, controller: PlayerAudioController) => () => void;
 
 const COLOR_PALETTE = ["#4CAF50", "#FF9800", "#E91E63", "#9C27B0", "#2196F3"];
 
@@ -145,15 +149,33 @@ const BottomNav = () => (
   </nav>
 );
 
-const YouTubePlayer = ({ youtubeId, isActive, isMuted, shouldPreload }: { youtubeId: string; isActive: boolean; isMuted: boolean; shouldPreload?: boolean }) => {
+const YouTubePlayer = ({ index, youtubeId, isActive, isMuted, shouldPreload, registerPlayer }: { index: number; youtubeId: string; isActive: boolean; isMuted: boolean; shouldPreload?: boolean; registerPlayer: RegisterPlayer }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isVideoReady, setIsVideoReady] = useState(false);
+  const lastAppliedMutedRef = useRef<boolean | null>(null);
+  const needsActivationRef = useRef(true);
   const shouldRender = isActive || shouldPreload;
+
+  const applyAudioState = useCallback((nextMuted: boolean) => {
+    const playerWindow = iframeRef.current?.contentWindow;
+    if (!playerWindow) return;
+
+    syncYouTubePlayback(playerWindow, { isMuted: nextMuted, shouldPlay: true });
+    lastAppliedMutedRef.current = nextMuted;
+    needsActivationRef.current = false;
+  }, []);
+
+  useEffect(() => {
+    if (!shouldRender) return;
+    return registerPlayer(index, applyAudioState);
+  }, [applyAudioState, index, registerPlayer, shouldRender]);
 
   // Reset video ready state when becoming inactive (and not preloading)
   useEffect(() => {
     if (!shouldRender) {
       setIsVideoReady(false);
+      lastAppliedMutedRef.current = null;
+      needsActivationRef.current = true;
     }
   }, [shouldRender]);
 
@@ -173,7 +195,8 @@ const YouTubePlayer = ({ youtubeId, isActive, isMuted, shouldPreload }: { youtub
         // Auto-pause if preloading and video starts playing
         if (data.event === "onStateChange" && data.info === 1) { // 1 = Playing
           if (shouldPreload && !isActive) {
-            iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", args: [] }), "*");
+            const playerWindow = iframeRef.current?.contentWindow;
+            if (playerWindow) sendYouTubeCommand(playerWindow, "pauseVideo");
           }
         }
       } catch {
@@ -196,14 +219,20 @@ const YouTubePlayer = ({ youtubeId, isActive, isMuted, shouldPreload }: { youtub
   useEffect(() => {
     if (!iframeRef.current || !isVideoReady) return;
 
+    const playerWindow = iframeRef.current.contentWindow;
+    if (!playerWindow) return;
+
     if (isActive) {
-      // Setup for active viewing
-      const muteAction = isMuted ? "mute" : "unMute";
-      iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: muteAction, args: [] }), "*");
-      iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "playVideo", args: [] }), "*");
+      if (needsActivationRef.current || lastAppliedMutedRef.current !== isMuted) {
+        syncYouTubePlayback(playerWindow, { isMuted, shouldPlay: true });
+        lastAppliedMutedRef.current = isMuted;
+      }
+      needsActivationRef.current = false;
     } else if (shouldPreload) {
       // Setup for preloading (muted)
-      iframeRef.current.contentWindow?.postMessage(JSON.stringify({ event: "command", func: "mute", args: [] }), "*");
+      syncYouTubePlayback(playerWindow, { isMuted: true, shouldPlay: false });
+      lastAppliedMutedRef.current = true;
+      needsActivationRef.current = true;
       // We rely on autoplay=1 to start, then the message listener pauses it
     }
   }, [isMuted, isVideoReady, isActive, shouldPreload]);
@@ -273,9 +302,9 @@ const VideoSidebar = ({ item }: { item: VideoItem }) => (
   </div>
 );
 
-const VideoCard = ({ item, isActive, isMuted, shouldPreload }: { item: VideoItem; isActive: boolean; isMuted: boolean; shouldPreload?: boolean }) => (
+const VideoCard = ({ index, item, isActive, isMuted, shouldPreload, registerPlayer }: { index: number; item: VideoItem; isActive: boolean; isMuted: boolean; shouldPreload?: boolean; registerPlayer: RegisterPlayer }) => (
   <div className="w-full h-full relative overflow-hidden" style={{ background: `linear-gradient(180deg, ${item.color} 0%, #000 120%)` }}>
-    <YouTubePlayer youtubeId={item.youtubeId} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} />
+    <YouTubePlayer index={index} youtubeId={item.youtubeId} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} registerPlayer={registerPlayer} />
     <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, transparent 20%, transparent 70%, rgba(0,0,0,0.8) 100%)' }} />
     <div className="absolute inset-0 flex flex-col justify-end pb-[48px] pointer-events-none">
       <div className="flex justify-between w-full pointer-events-auto items-end pb-2">
@@ -288,16 +317,43 @@ const VideoCard = ({ item, isActive, isMuted, shouldPreload }: { item: VideoItem
 
 function App() {
   const [isMuted, setIsMuted] = useState(true);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const playerControllersRef = useRef(new Map<number, PlayerAudioController>());
+
+  const registerPlayer = useCallback<RegisterPlayer>((index, controller) => {
+    playerControllersRef.current.set(index, controller);
+
+    return () => {
+      if (playerControllersRef.current.get(index) === controller) {
+        playerControllersRef.current.delete(index);
+      }
+    };
+  }, []);
+
+  const toggleMute = useCallback(() => {
+    const nextMuted = !isMuted;
+    playerControllersRef.current.get(activeIndex)?.(nextMuted);
+    setIsMuted(nextMuted);
+  }, [activeIndex, isMuted]);
+
+  const handleIndexChange = useCallback((nextIndex: number, source: IndexChangeSource) => {
+    if (!isMuted && source.startsWith("user:")) {
+      playerControllersRef.current.get(nextIndex)?.(false);
+    }
+    setActiveIndex(nextIndex);
+  }, [isMuted]);
 
   return (
     <div className="w-full h-full bg-black flex justify-center">
       {/* Constrain to mobile-like width on desktop */}
       <main className="w-full max-w-[430px] h-full relative text-white bg-black">
-        <MuteButton isMuted={isMuted} toggleMute={() => setIsMuted(!isMuted)} />
+        <MuteButton isMuted={isMuted} toggleMute={toggleMute} />
         <Header />
         <div className="w-full h-full">
           <SwipeDeck
             items={items}
+            index={activeIndex}
+            onIndexChange={handleIndexChange}
             className="w-full h-full overflow-y-auto overflow-x-hidden relative scrollbar-none"
             gesture={{ ignoreWhileAnimating: false }}
             keyboard={{ global: true }}
@@ -305,7 +361,7 @@ function App() {
             preload={2} // Preload the next 2 videos
             preloadPrevious={1} // Keep the previous video preloaded
           >
-            {({ item, isActive, shouldPreload }) => <VideoCard item={item} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} />}
+            {({ item, index, isActive, shouldPreload }) => <VideoCard index={index} item={item} isActive={isActive} isMuted={isMuted} shouldPreload={shouldPreload} registerPlayer={registerPlayer} />}
           </SwipeDeck>
         </div>
         <BottomNav />
