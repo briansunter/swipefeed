@@ -51,9 +51,13 @@ export function useKeyboard(params: UseKeyboardParams) {
 
       const isHorizontal = orientation === "horizontal";
       const rtl = direction === "rtl";
+      const stopIfGlobal = () => {
+        if (isGlobal) evt.stopPropagation();
+      };
 
       if (prevKeys.includes(key)) {
         evt.preventDefault();
+        stopIfGlobal();
         if (isHorizontal && rtl) onNext();
         else onPrev();
         return;
@@ -61,6 +65,7 @@ export function useKeyboard(params: UseKeyboardParams) {
 
       if (nextKeys.includes(key)) {
         evt.preventDefault();
+        stopIfGlobal();
         if (isHorizontal && rtl) onPrev();
         else onNext();
         return;
@@ -68,17 +73,19 @@ export function useKeyboard(params: UseKeyboardParams) {
 
       if (bindings.first?.includes(key)) {
         evt.preventDefault();
+        stopIfGlobal();
         onFirst?.();
         return;
       }
 
       if (bindings.last?.includes(key)) {
         evt.preventDefault();
+        stopIfGlobal();
         onLast?.();
         return;
       }
     },
-    [bindings, direction, enabled, onFirst, onLast, onNext, onPrev, orientation],
+    [bindings, direction, enabled, isGlobal, onFirst, onLast, onNext, onPrev, orientation],
   );
 
   // Global listener support
@@ -93,4 +100,3 @@ export function useKeyboard(params: UseKeyboardParams) {
 
   return { onKeyDown: handleKeyDown };
 }
-

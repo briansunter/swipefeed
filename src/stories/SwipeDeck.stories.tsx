@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import React from "react";
 import { SwipeDeck } from "../components/SwipeDeck";
+import type { SwipeDeckProps } from "../types";
 
 type DemoItem = { id: string; title: string };
 
@@ -21,11 +22,11 @@ const storiesItems = Array.from({ length: 10 }, (_, i) => ({
 
 const meta = {
   title: "SwipeDeck/Examples",
-  component: SwipeDeck as unknown as React.ComponentType<import("../types").SwipeDeckProps<DemoItem>>,
+  component: SwipeDeck as unknown as React.ComponentType<SwipeDeckProps<DemoItem>>,
   parameters: {
     layout: "fullscreen",
   },
-} satisfies Meta<typeof SwipeDeck>;
+} satisfies Meta<React.ComponentType<SwipeDeckProps<DemoItem>>>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -150,4 +151,3 @@ export const Controlled: Story = {
     ),
   },
 };
-

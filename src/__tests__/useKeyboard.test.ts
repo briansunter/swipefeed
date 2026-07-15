@@ -150,6 +150,27 @@ describe("useKeyboard", () => {
     expect(onPrev).toHaveBeenCalled();
   });
 
+  it("stops propagation for handled global keyboard events", () => {
+    const stopPropagation = vi.fn();
+    const { result } = renderHook(() =>
+      useKeyboard({
+        orientation: "vertical",
+        direction: "ltr",
+        config: { enabled: true, global: true },
+        onPrev: vi.fn(),
+        onNext: vi.fn(),
+      }),
+    );
+
+    result.current.onKeyDown({
+      key: "ArrowDown",
+      preventDefault: vi.fn(),
+      stopPropagation,
+    } as unknown as React.KeyboardEvent);
+
+    expect(stopPropagation).toHaveBeenCalledTimes(1);
+  });
+
   it("does not add global listener when global is false", () => {
     const addEventListenerSpy = vi.spyOn(window, "addEventListener");
 
@@ -204,4 +225,3 @@ describe("useKeyboard", () => {
     expect(onNext).toHaveBeenCalled();
   });
 });
-

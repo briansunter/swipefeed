@@ -1,5 +1,12 @@
 import { useCallback, useRef, useEffect } from "react";
 import type { Direction, Orientation } from "../types";
+import {
+  WHEEL_MAX_DELTA_ACCUMULATION,
+  WHEEL_MAX_VISUAL_DELTA,
+  WHEEL_FLICK_VELOCITY_THRESHOLD,
+  WHEEL_FLICK_DISTANCE_THRESHOLD,
+  WHEEL_VELOCITY_SMOOTHING_WEIGHT,
+} from "../constants";
 
 export type UseWheelParams = {
   orientation: Orientation;
@@ -48,16 +55,6 @@ export function useWheel(params: UseWheelParams) {
   const isTracking = useRef(false);
   const velocityRef = useRef(0);
 
-  // Maximum delta per single wheel event for ACCUMULATION (triggering the swap)
-  // We allow a reasonable amount so fast scrolls work, but dampen insane values
-  const MAX_DELTA_ACCUMULATION = 120;
-
-  // Maximum delta per single wheel event for VISUAL DRAG
-  // This is the key to fixing "jerky" mouse wheel.
-  // If we receive a 100px mouse wheel event, we clamp the visual drag to ~30px
-  // so it looks like a smooth nudge rather than a teleport.
-  // Continuous trackpad events (usually < 20px) pass through untouched.
-  const MAX_VISUAL_DELTA = 40;
 
   const endGesture = useCallback(() => {
     isTracking.current = false;
@@ -93,7 +90,6 @@ export function useWheel(params: UseWheelParams) {
           // Reset tracking state WITHOUT calling onDragEnd (which triggers snap navigation)
           // We don't want snap to fight with the navigation that just happened
           if (isTracking.current) {
-            console.log('[useWheel] Ignoring wheel event during cooldown');
             isTracking.current = false;
             accumulated.current = 0;
             gestureDirection.current = null;
@@ -132,15 +128,15 @@ export function useWheel(params: UseWheelParams) {
 
       // 1. Calculate delta for ACCUMULATION (Threshold Check)
       // Allow fairly large steps so mouse wheel (100) triggers threshold quickly if repeated
-      const accumDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), MAX_DELTA_ACCUMULATION);
+      const accumDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), WHEEL_MAX_DELTA_ACCUMULATION);
 
       // 2. Calculate delta for VISUAL DRAG (Smoothing)
-      // Cap at MAX_VISUAL_DELTA so 100px jumps become 40px nudges
-      const visualDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), MAX_VISUAL_DELTA);
+      // Cap at WHEEL_MAX_VISUAL_DELTA so 100px jumps become 40px nudges
+      const visualDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), WHEEL_MAX_VISUAL_DELTA);
 
       // Flick detection velocity
       const instantVelocity = (timeDelta > 0 && timeDelta < 100) ? Math.abs(accumDelta / timeDelta) : 0;
-      velocityRef.current = velocityRef.current * 0.8 + instantVelocity * 0.2;
+      velocityRef.current = velocityRef.current * WHEEL_VELOCITY_SMOOTHING_WEIGHT + instantVelocity * (1 - WHEEL_VELOCITY_SMOOTHING_WEIGHT);
 
       accumulated.current += accumDelta;
 
@@ -150,19 +146,10 @@ export function useWheel(params: UseWheelParams) {
       resetAccumulated();
 
       const matchesThreshold = Math.abs(accumulated.current) >= threshold;
-      const isFlick = velocityRef.current > 1.2 && Math.abs(accumulated.current) > 20;
+      const isFlick = velocityRef.current > WHEEL_FLICK_VELOCITY_THRESHOLD && Math.abs(accumulated.current) > WHEEL_FLICK_DISTANCE_THRESHOLD;
 
       if (matchesThreshold || isFlick) {
         const navDelta: 1 | -1 = accumulated.current > 0 ? 1 : -1;
-
-        console.log('[useWheel] Navigation triggered', {
-          navDelta,
-          accumulated: accumulated.current,
-          threshold,
-          matchesThreshold,
-          isFlick,
-          velocity: velocityRef.current,
-        });
 
         // Reset tracking state without calling onDragEnd
         // onDragEnd is for when gesture ends WITHOUT navigation (snap back)

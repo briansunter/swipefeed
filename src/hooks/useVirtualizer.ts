@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useState, useMemo, useCallback } from "react";
 import { useVirtualizer as useTanStackVirtualizer } from "@tanstack/react-virtual";
 import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types";
+import { VIRTUALIZER_FALLBACK_SIZE_PX } from "../constants";
 
 // Use useLayoutEffect on client, useEffect on server (SSR safety)
 const useIsomorphicLayoutEffect = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -35,7 +36,7 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     // Initial fallback: use window size if available, else 800
     const fallback = typeof window !== "undefined"
       ? (orientation === "vertical" ? window.innerHeight : window.innerWidth)
-      : 800;
+      : VIRTUALIZER_FALLBACK_SIZE_PX;
     return { size: fallback, measured: false };
   });
 
@@ -90,13 +91,13 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     }
 
     // Fall back to explicit size or default
-    return typeof explicitSize === 'number' ? explicitSize : 800;
+    return typeof explicitSize === 'number' ? explicitSize : VIRTUALIZER_FALLBACK_SIZE_PX;
   }, [virtual?.estimatedSize, items, measuredSize]);
 
   // Compute initialRect from window size for first render (before scroll element is available)
   const initialRect = useMemo(() => {
     if (typeof window === "undefined") {
-      return { width: 800, height: 800 };
+      return { width: VIRTUALIZER_FALLBACK_SIZE_PX, height: VIRTUALIZER_FALLBACK_SIZE_PX };
     }
     return {
       width: window.innerWidth,

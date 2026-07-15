@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { WINDOW_RESIZE_DEBOUNCE_MS } from "../constants";
 
 export function useWindowSize() {
     const [size, setSize] = useState<{ width: number; height: number }>({
@@ -15,7 +16,7 @@ export function useWindowSize() {
             clearTimeout(timeoutId);
             timeoutId = setTimeout(() => {
                 setSize({ width: window.innerWidth, height: window.innerHeight });
-            }, 100);
+            }, WINDOW_RESIZE_DEBOUNCE_MS);
         };
 
         window.addEventListener("resize", handleResize);
