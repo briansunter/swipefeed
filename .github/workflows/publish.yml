@@ -22,7 +22,7 @@ jobs:
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.2
 
       - uses: actions/setup-node@v4
         with:
@@ -53,6 +53,13 @@ jobs:
 
       - name: Build
         run: bun run build
+
+      - name: Verify packed tarball
+        # Fail-closed gate: build -> pack -> install the tarball into an
+        # isolated consumer and prove the Bun bundle, Node import, and tsc
+        # type resolution all work. Blocks poisoned artifacts (e.g. the
+        # v1.1.2..v1.2.0 stub bundles) from reaching semantic-release.
+        run: bun scripts/verify-pack.ts
 
       - name: Setup BWS
         run: |
