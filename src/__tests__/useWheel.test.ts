@@ -250,7 +250,7 @@ describe("useWheel", () => {
         expect(onRequestIndexChange).not.toHaveBeenCalled();
     });
 
-    it("resets accumulation on direction change", () => {
+    it("reversal first unwinds the accumulated displacement", () => {
         const onRequestIndexChange = vi.fn();
         let mockTime = 0;
         vi.spyOn(performance, "now").mockImplementation(() => mockTime);
@@ -273,7 +273,7 @@ describe("useWheel", () => {
 
         mockTime += 50; // within debounce
 
-        // Change direction (scroll up) - should reset accumulation
+        // Reverse back to the start before accumulating in the other direction
         fireWheelEvent(mockViewport, -40);
         expect(onRequestIndexChange).not.toHaveBeenCalled();
 
@@ -284,7 +284,10 @@ describe("useWheel", () => {
 
         mockTime += 50;
         fireWheelEvent(mockViewport, -40);
-        // Now accumulated enough
+        // Net displacement is only -80, so wait for deliberate movement.
+        expect(onRequestIndexChange).not.toHaveBeenCalled();
+        mockTime += 50;
+        fireWheelEvent(mockViewport, -40);
         expect(onRequestIndexChange).toHaveBeenCalledWith(-1);
     });
 

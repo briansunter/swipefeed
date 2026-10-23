@@ -4,6 +4,8 @@ import type { Direction, Orientation } from "../types";
 
 type UseGesturesParams = {
   enabled?:boolean;
+  dragFromControls?: boolean;
+  inputTarget?: HTMLElement | null;
   orientation: Orientation;
   direction: Direction;
   threshold: number;
@@ -38,6 +40,7 @@ function inputTime(event:{timeStamp:number}) {
 export function useGestures(params: UseGesturesParams) {
   const latest = useRef(params);
   latest.current = params;
+  const suppressClickUntil = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
   const state = useRef<{
     pointer: number; start: number; cross: number; delta: number;
@@ -57,6 +60,7 @@ export function useGestures(params: UseGesturesParams) {
     const s = state.current, p = latest.current;
     if (!s) return;
     if (!s.started) { reset(); return; }
+    suppressClickUntil.current = performance.now() + 500;
     const last=s.samples.at(-1)!;
     const cutoff=now-100;
     let first=s.samples[0];
@@ -96,7 +100,11 @@ export function useGestures(params: UseGesturesParams) {
     if (evt.pointerType === "touch" && !p.controlledTouch) return;
     if (evt.isPrimary === false || evt.button !== 0 || state.current) return;
     if (p.ignoreWhileAnimating && p.isAnimating && !p.controlledTouch) return;
-    if ((evt.target as Element).closest?.("a,button,input,textarea,select,summary,[contenteditable=true],[data-swipe-ignore]")) return;
+    const ignored = p.dragFromControls
+      ? "input,textarea,select,[contenteditable=true],[data-swipe-ignore],details[open]"
+      : "a,button,input,textarea,select,summary,[contenteditable=true],[data-swipe-ignore]";
+    if ((evt.target as Element).closest?.(ignored)) return;
+    suppressClickUntil.current = 0;
     state.current = {pointer:evt.pointerId,start:coord(evt,true),cross:coord(evt,false),delta:0,
       index:p.getIndex(),started:false,rejected:false,samples:[{position:coord(evt,true),time:inputTime(evt)}]};
   }, []);
@@ -164,7 +172,31 @@ export function useGestures(params: UseGesturesParams) {
       document.removeEventListener("visibilitychange", hidden);
     };
   }, [finish, onPointerUp, onPointerCancel]);
+  const onClickCapture = useCallback((event: React.MouseEvent) => {
+    if (event.detail > 0 && performance.now() < suppressClickUntil.current) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  }, []);
+  const onDragStartCapture = useCallback((event: React.DragEvent) => {
+    // Native link/image dragging cancels pointer delivery before our drag can claim it.
+    if (latest.current.dragFromControls && state.current) event.preventDefault();
+  }, []);
+  useEffect(() => {
+    const element = params.inputTarget;
+    if (!element) return;
+    const listeners = { pointerdown: onPointerDown, pointermove: onPointerMove,
+      pointerup: onPointerUp, pointercancel: onPointerCancel, lostpointercapture: onLostPointerCapture };
+    for (const [name, handler] of Object.entries(listeners)) element.addEventListener(name, handler as unknown as EventListener, {passive:false});
+    element.addEventListener('dragstart', onDragStartCapture as unknown as EventListener, true);
+    element.addEventListener('click', onClickCapture as unknown as EventListener, true);
+    return () => {
+      for (const [name, handler] of Object.entries(listeners)) element.removeEventListener(name, handler as unknown as EventListener);
+      element.removeEventListener('dragstart', onDragStartCapture as unknown as EventListener, true);
+      element.removeEventListener('click', onClickCapture as unknown as EventListener, true);
+    };
+  }, [params.inputTarget, onPointerDown, onPointerMove, onPointerUp, onPointerCancel, onLostPointerCapture, onClickCapture, onDragStartCapture]);
   const hasPointer = useCallback(() => state.current !== null, []);
-  return useMemo(() => ({isDragging,reset,hasPointer,handlers:{onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture}}),
-    [isDragging,reset,hasPointer,onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture]);
+  return useMemo(() => ({isDragging,reset,hasPointer,handlers:{onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture,onClickCapture,onDragStartCapture}}),
+    [isDragging,reset,hasPointer,onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture,onClickCapture,onDragStartCapture]);
 }

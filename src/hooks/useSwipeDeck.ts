@@ -381,7 +381,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       // Minimum cooldown between ANY navigations (prevents multi-swipe)
       // Programmatic navigation bypasses cooldown since it's explicit API usage
-      if (now - lastNavigationTimeRef.current < NAVIGATION_COOLDOWN_MS && source !== "snap" && source !== "programmatic" && source !== "user:gesture") {
+      if (now - lastNavigationTimeRef.current < NAVIGATION_COOLDOWN_MS && source !== "snap" && source !== "programmatic" && source !== "user:gesture" && source !== "user:wheel") {
         return;
       }
 
@@ -623,26 +623,32 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     orientation,
     direction,
     discretePaging: wheelCfg.discretePaging ?? true,
+    enabled: gestureCfg.enabled,
+    canStart: () => !gestures.hasPointer(),
     threshold: wheelCfg.threshold ?? 80,
     debounce: wheelCfg.debounce ?? 120,
     cooldown: wheelCfg.cooldown ?? 400,
     onRequestIndexChange: delta => {
       onDragEnd();
-      navigateTo(latest.current.index + delta, "user:wheel");
+      const p = latest.current;
+      const target = p.loop ? p.index + delta : clamp(p.index + delta, 0, p.items.length - 1);
+      navigateTo(target, target === p.index ? "snap" : "user:wheel");
     },
-    viewport,
+    viewport: options.inputTarget ?? viewport,
     onDragStart,
     onDrag,
     onDragEnd: () => {
       onDragEnd();
       // Calculate correct target from scroll position, not from state
-      const targetIndex = getSnapTargetIndex();
+      const targetIndex = latest.current.options.gesture?.touch === "controlled" ? latest.current.index : getSnapTargetIndex();
       navigateTo(targetIndex, "snap");
     },
   });
 
   const gestures = useGestures({
     enabled:gestureCfg.enabled,
+    inputTarget: options.inputTarget,
+    dragFromControls: gestureCfg.dragFromControls,
     orientation,
     direction,
     threshold: gestureCfg.threshold ?? 50,
@@ -660,7 +666,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     onRequestIndexChange: next => navigateTo(next, "user:gesture"),
     setAnimating: setIsAnimating,
     isAnimating,
-    onDragStart,
+    onDragStart: () => { wheel.cancel(); onDragStart(); },
     onDrag,
     onDragEnd,
   });
@@ -930,10 +936,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       onTouchStart: gestureCfg.touch === "controlled" ? undefined : handleTouchStart,
       onTouchEnd: gestureCfg.touch === "controlled" ? undefined : handleTouchEnd,
       onTouchCancel: gestureCfg.touch === "controlled" ? undefined : handleTouchEnd,
-      ...gestures.handlers,
+      ...(options.inputTarget ? {} : gestures.handlers),
       style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, gestureCfg.touch, handleScroll, handleTouchStart, handleTouchEnd, isAnimating, keyboard.onKeyDown, keyboardCfg.global, orientation, gestures.handlers]);
+  }, [options.inputTarget, ariaLabel, gestureCfg.touch, handleScroll, handleTouchStart, handleTouchEnd, isAnimating, keyboard.onKeyDown, keyboardCfg.global, orientation, gestures.handlers]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {

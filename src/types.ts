@@ -38,6 +38,8 @@ export interface GestureConfig {
   enabled?: boolean;
   /** Controlled touch owns dragging and release; native leaves touch to the browser. */
   touch?: "native" | "controlled";
+  /** Let a drag start on a link/button; taps and keyboard activation remain native. */
+  dragFromControls?: boolean;
   /** Required drag distance as a fraction of viewport size, in addition to threshold. */
   distanceRatio?: number;
   /** Upper bound for the viewport-scaled release threshold, in pixels. */
@@ -53,7 +55,9 @@ export interface GestureConfig {
 export interface WheelConfig {
   discretePaging?: boolean;
   threshold?: number;
+  /** Quiet interval between wheel sequences, including momentum. */
   debounce?: number;
+  /** Optional minimum between commits, never a momentum unlock timer. */
   cooldown?: number;
 }
 
@@ -86,6 +90,8 @@ export interface VirtualConfig {
 
 export interface SwipeDeckOptions<T> {
   items: readonly T[];
+  /** Common ancestor for input on the deck and its fixed overlay controls. */
+  inputTarget?: HTMLElement | null;
   orientation?: Orientation;
   /** Opt-in eased slide duration in milliseconds; reduced motion stays instant. */
   transitionDuration?: number;
