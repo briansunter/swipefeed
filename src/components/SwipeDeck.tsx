@@ -39,9 +39,10 @@ export function SwipeDeck<T>(
 
   const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
   const visible = new Set(deck.virtualItems.map(item => item.index));
-  const anchors = options.virtual?.retainSnapAnchors
-    ? deck.items.map((item, index) => ({index, key: options.virtual?.getItemKey?.(item, index) ?? index}))
-    : deck.virtualItems;
+  const retainedAnchors = useMemo(() => deck.items.map((item, index) =>
+    ({index, key: options.virtual?.getItemKey?.(item, index) ?? index})),
+    [deck.items, options.virtual?.getItemKey]);
+  const anchors = options.virtual?.retainSnapAnchors ? retainedAnchors : deck.virtualItems;
 
   /* Fullscreen styles if enabled */
   const fullscreenStyle: React.CSSProperties = props.fullscreen

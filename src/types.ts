@@ -34,6 +34,12 @@ export interface SwipeDeckMotion {
 }
 
 export interface GestureConfig {
+  /** Controlled touch owns dragging and release; native leaves touch to the browser. */
+  touch?: "native" | "controlled";
+  /** Required drag distance as a fraction of viewport size, in addition to threshold. */
+  distanceRatio?: number;
+  /** Minimum total movement before recent velocity can count as a flick. */
+  minFlickDistance?: number;
   threshold?: number;
   flickVelocity?: number;
   lockAxis?: boolean;
