@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, useMemo, useCallback } from "react";
-import { useVirtualizer as useTanStackVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer as useTanStackVirtualizer, defaultRangeExtractor } from "@tanstack/react-virtual";
 import type { VirtualConfig, SwipeDeckVirtualItem, Orientation } from "../types";
 import { VIRTUALIZER_FALLBACK_SIZE_PX } from "../constants";
 
@@ -11,6 +11,7 @@ type UseVirtualizerParams<T> = {
   virtual: VirtualConfig | undefined;
   getScrollElement: () => HTMLElement | null;
   orientation?: Orientation;
+  activeIndex?: number;
 };
 
 type VirtualizerResult = {
@@ -29,6 +30,7 @@ type VirtualizerResult = {
 export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerResult {
   const { items, virtual, getScrollElement, orientation = "vertical" } = params;
   const count = items.length;
+  const activeIndex = params.activeIndex;
 
   // Auto-detect viewport size when estimatedSize is not provided
   // Use state with a "generation" counter to force re-render when element is measured
@@ -111,6 +113,15 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     return (index: number) => virtual.getItemKey?.(items[index], index) ?? index;
   }, [virtual?.getItemKey, items]);
 
+  const rangeExtractor = useCallback((range: Parameters<typeof defaultRangeExtractor>[0]) => {
+    const indexes = defaultRangeExtractor(range);
+    if (activeIndex !== undefined && activeIndex >= 0 && activeIndex < count && !indexes.includes(activeIndex)) {
+      indexes.push(activeIndex);
+      indexes.sort((a, b) => a - b);
+    }
+    return indexes;
+  }, [activeIndex, count]);
+
   const rowVirtualizer = useTanStackVirtualizer({
     count,
     getScrollElement,
@@ -118,6 +129,7 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     overscan: virtual?.overscan ?? 5,
     horizontal: orientation === "horizontal",
     getItemKey,
+    rangeExtractor,
     // CRITICAL: Provide initialRect so virtualizer can calculate items on first render
     // even when getScrollElement() returns null
     initialRect,
@@ -129,24 +141,28 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     rowVirtualizer.measure();
   }, [rowVirtualizer, measuredSize, orientation]);
 
-  // NOTE: Do NOT wrap this in useMemo! The rowVirtualizer object is stable,
-  // but getVirtualItems() returns different results on each scroll event.
-  // Wrapping in useMemo causes stale virtualItems that don't update on scroll.
+  // Always retain active media even during the brief empty-range measurement
+  // transition; remounting an iframe would reset animation/playback state.
+  const virtualItems: SwipeDeckVirtualItem[] = rowVirtualizer.getVirtualItems().map(item => ({
+    index: item.index, key: item.key as string | number, offset: item.start,
+    size: item.size, measureElement: rowVirtualizer.measureElement,
+  }));
+  if (activeIndex !== undefined && activeIndex >= 0 && activeIndex < count && !virtualItems.some(item => item.index === activeIndex)) {
+    let offset = 0;
+    for (let i = 0; i < activeIndex; i++) offset += getEstimatedSize(i);
+    virtualItems.push({ index: activeIndex, key: virtual?.getItemKey?.(items[activeIndex], activeIndex) ?? activeIndex,
+      offset, size: getEstimatedSize(activeIndex), measureElement: rowVirtualizer.measureElement });
+    virtualItems.sort((a,b) => a.index - b.index);
+  }
   return {
-    virtualItems: rowVirtualizer.getVirtualItems().map(item => ({
-      index: item.index,
-      key: item.key as string | number,
-      offset: item.start,
-      size: item.size,
-      measureElement: rowVirtualizer.measureElement,
-    })),
+    virtualItems,
     totalSize: rowVirtualizer.getTotalSize(),
     getItemOffset: (index: number) => {
-      const found = rowVirtualizer.getVirtualItems().find(v => v.index === index);
-      return found ? found.start : 0;
+      const found = virtualItems.find(v => v.index === index);
+      return found ? found.offset : 0;
     },
     getItemSize: (index: number) => {
-      const found = rowVirtualizer.getVirtualItems().find(v => v.index === index);
+      const found = virtualItems.find(v => v.index === index);
       return found ? found.size : 0;
     },
     scrollToIndex: (index: number, options?: { align?: 'start' | 'center' | 'end' | 'auto', behavior?: 'auto' | 'smooth' }) => {

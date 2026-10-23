@@ -276,3 +276,12 @@ it("invalidates cached item sizes when the viewport changes", () => {
   rerender({height:400});
   expect(result.current.totalSize).toBe(2000);
 });
+
+it("retains the active media item while scroll geometry is being reconciled", () => {
+  const container=document.createElement("div");
+  Object.defineProperty(container,"clientHeight",{configurable:true,value:800});
+  const items=Array.from({length:100},(_,i)=>i);
+  const {result}=renderHook(()=>useVirtualizer({items,activeIndex:75,virtual:{overscan:1},getScrollElement:()=>container}));
+  expect(result.current.virtualItems.some(item=>item.index===75)).toBe(true);
+  expect(result.current.virtualItems.length).toBeLessThan(10);
+});

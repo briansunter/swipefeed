@@ -123,6 +123,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   const virtualizer = useVirtualizer({
     items,
+    activeIndex: index,
     virtual: virtualCfg,
     getScrollElement: useCallback(() => viewport, [viewport]),
     orientation,
