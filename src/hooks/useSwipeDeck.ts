@@ -99,6 +99,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
 
   const sourceRef = useRef<IndexChangeSource>("snap");
+  const resizeSettlingUntil = useRef(0);
   const dragStartScrollRef = useRef<number>(0);
   const isNavigatingRef = useRef(false); // Track programmatic navigation to prevent scroll handler interference
   const snapRestoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null); // Track snap restore timeout
@@ -158,6 +159,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const applyIndexChange = useCallback(
     (nextIndex: number) => {
       const { index, isControlled, options, setInternalIndex, setIsAnimating } = latest.current;
+      if (Date.now() < resizeSettlingUntil.current) return;
       if (nextIndex === index) {
         // A settled controlled navigation still needs to release gesture state.
         setIsAnimating(false);
@@ -630,6 +632,12 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     });
   }, [applyIndexChange, scheduleMotion]);
 
+  useEffect(() => () => {
+    if (scrollEndTimeoutRef.current) clearTimeout(scrollEndTimeoutRef.current);
+    if (snapRestoreTimeoutRef.current) clearTimeout(snapRestoreTimeoutRef.current);
+    if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+  }, []);
+
   // onEndReached
   useEffect(() => {
     if (items.length === 0) return;
@@ -665,6 +673,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     if (!viewport) return;
 
     const handleResize = () => {
+      resizeSettlingUntil.current = Date.now() + 500;
       // Browser scroll-snap may move the viewport before the resize debounce.
       // Fence those scroll callbacks so rotation cannot replace a controlled URL.
       const current = latest.current;

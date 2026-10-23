@@ -123,6 +123,12 @@ export function useVirtualizer<T>(params: UseVirtualizerParams<T>): VirtualizerR
     initialRect,
   });
 
+  // TanStack caches estimated item sizes by key. CSS viewport-sized slides
+  // change on rotation, so invalidate those cached measurements as well.
+  useIsomorphicLayoutEffect(() => {
+    rowVirtualizer.measure();
+  }, [rowVirtualizer, measuredSize, orientation]);
+
   // NOTE: Do NOT wrap this in useMemo! The rowVirtualizer object is stable,
   // but getVirtualItems() returns different results on each scroll event.
   // Wrapping in useMemo causes stale virtualItems that don't update on scroll.

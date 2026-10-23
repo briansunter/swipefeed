@@ -264,3 +264,15 @@ describe("useVirtualizer", () => {
     Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: originalInnerHeight });
   });
 });
+
+it("invalidates cached item sizes when the viewport changes", () => {
+  const container=document.createElement("div");
+  const items=[0,1,2,3,4];
+  const {result,rerender}=renderHook(({height})=>{
+    Object.defineProperty(container,"clientHeight",{configurable:true,value:height});
+    return useVirtualizer({items,virtual:{overscan:1},getScrollElement:()=>container});
+  },{initialProps:{height:800}});
+  expect(result.current.totalSize).toBe(4000);
+  rerender({height:400});
+  expect(result.current.totalSize).toBe(2000);
+});
