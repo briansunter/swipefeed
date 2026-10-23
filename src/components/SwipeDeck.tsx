@@ -64,14 +64,14 @@ export function SwipeDeck<T>(
     () => ({
       // Use CSS viewport units for total size - automatically updates on rotation!
       height: deck.orientation === "vertical"
-        ? `calc(${deck.items.length} * 100dvh)`
+        ? options.gesture?.touch === "controlled" ? deck.totalSize : `calc(${deck.items.length} * 100dvh)`
         : "100%",
       width: deck.orientation === "horizontal"
-        ? `calc(${deck.items.length} * 100dvw)`
+        ? options.gesture?.touch === "controlled" ? deck.totalSize : `calc(${deck.items.length} * 100dvw)`
         : "100%",
       position: "relative",
     }),
-    [deck.orientation, deck.items.length],
+    [deck.orientation, deck.items.length, deck.totalSize, options.gesture?.touch],
   );
 
   // Cast As to ElementType to avoid TS issues with polymorphic string/component

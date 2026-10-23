@@ -124,7 +124,7 @@ export function useGestures(params: UseGesturesParams) {
       while(s.samples.length>2&&s.samples[1].time<time-140)s.samples.shift();
       if(s.samples.length>64)s.samples.splice(1,s.samples.length-64);
     };
-    const native=evt.nativeEvent;
+    const native=evt.nativeEvent??evt;
     for(const point of native.getCoalescedEvents?.()??[])record(point,true);
     record(evt,!final);
     if (evt.cancelable) evt.preventDefault();
@@ -146,6 +146,25 @@ export function useGestures(params: UseGesturesParams) {
     // That child loss bubbles here and must not cancel the new owner.
     if (evt.target === evt.currentTarget && evt.pointerId === state.current?.pointer) finish(true);
   }, [finish]);
-  return useMemo(() => ({isDragging,reset,handlers:{onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture}}),
-    [isDragging,reset,onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture]);
+  useEffect(() => {
+    // Browser chrome and capture loss may route the end outside the deck.
+    const up = (event: PointerEvent) => onPointerUp(event as unknown as React.PointerEvent);
+    const cancel = () => finish(true);
+    const hidden = () => { if (document.hidden) cancel(); };
+    window.addEventListener("pointerup", up);
+    window.addEventListener("pointercancel", onPointerCancel as unknown as EventListener);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("pagehide", cancel);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("pointerup", up);
+      window.removeEventListener("pointercancel", onPointerCancel as unknown as EventListener);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("pagehide", cancel);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, [finish, onPointerUp, onPointerCancel]);
+  const hasPointer = useCallback(() => state.current !== null, []);
+  return useMemo(() => ({isDragging,reset,hasPointer,handlers:{onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture}}),
+    [isDragging,reset,hasPointer,onPointerDown,onPointerMove,onPointerUp,onPointerCancel,onLostPointerCapture]);
 }

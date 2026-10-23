@@ -436,15 +436,18 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
           if (snapRestoreTimeoutRef.current) clearTimeout(snapRestoreTimeoutRef.current);
           snapRestoreTimeoutRef.current = null;
           write(target);
-          viewport.style.scrollSnapType = orientation === "vertical" ? "y mandatory" : "x mandatory";
-          // Reconcile after compositor snapping without shortening the animation.
+          viewport.style.scrollSnapType = latest.current.options.gesture?.touch === "controlled" ? "none" : orientation === "vertical" ? "y mandatory" : "x mandatory";
+          // The deadline must release state even if WebKit defers the next rAF.
+          isNavigatingRef.current = false;
+          latest.current.setIsAnimating(false);
+          sourceRef.current = "snap";
+          emitMotion();
           alignmentRafRef.current = requestAnimationFrame(() => {
             alignmentRafRef.current = null;
-            if (lastNavigationIndexRef.current === next) write(target);
-            isNavigatingRef.current = false;
-            latest.current.setIsAnimating(false);
-            sourceRef.current = "snap";
-            emitMotion();
+            if (lastNavigationIndexRef.current === next && !dragActiveRef.current) {
+              write(target);
+              emitMotion();
+            }
           });
         };
         const tick = (now: number) => {
@@ -502,7 +505,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
           snapRestoreTimeoutRef.current = null;
         }
         if (viewport) {
-          viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
+          viewport.style.scrollSnapType = latest.current.options.gesture?.touch === 'controlled' ? 'none' : orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
         }
       };
 
@@ -685,6 +688,22 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       if (process.env.NODE_ENV !== 'production') console.warn('[SwipeDeck] Navigation lock timeout - forcing unlock');
     }
 
+    // Controlled input owns selection. A late compositor scroll is drift,
+    // never permission to select an unrendered neighbor or start native easing.
+    if (latest.current.options.gesture?.touch === "controlled") {
+      if (!isNavigatingRef.current && !dragActiveRef.current && !gestures.hasPointer()) {
+        const {viewport,orientation,index}=latest.current;
+        if (viewport) {
+          const size=orientation==="vertical"?viewport.clientHeight:viewport.clientWidth;
+          const current=orientation==="vertical"?viewport.scrollTop:viewport.scrollLeft;
+          if (Math.abs(current-index*size)>1) {
+            viewport.scrollTo(orientation==="vertical"?{top:index*size,behavior:"instant"}:{left:index*size,behavior:"instant"});
+            latest.current.setIsAnimating(false);
+          }
+        }
+      }
+      return;
+    }
     // Skip scroll-based index calculation during programmatic navigation
     if (isNavigatingRef.current || dragActiveRef.current) return;
 
@@ -738,7 +757,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         applyIndexChange(newIndex);
       }
     });
-  }, [applyIndexChange, scheduleMotion]);
+  }, [applyIndexChange, scheduleMotion, gestures.hasPointer]);
 
   useEffect(() => () => {
     if (scrollEndTimeoutRef.current) clearTimeout(scrollEndTimeoutRef.current);
@@ -782,7 +801,28 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   useEffect(() => {
     if (!viewport) return;
 
+    let previousWidth=viewport.clientWidth, previousHeight=viewport.clientHeight;
     const handleResize = () => {
+      const width=viewport.clientWidth,height=viewport.clientHeight;
+      const oldWidth=previousWidth,oldHeight=previousHeight;
+      if(width===oldWidth&&height===oldHeight){
+        const size=latest.current.orientation==="vertical"?height:width;
+        const offset=latest.current.orientation==="vertical"?viewport.scrollTop:viewport.scrollLeft;
+        if(gestures.hasPointer()||isNavigatingRef.current||Math.abs(offset-latest.current.index*size)<1)return;
+      }
+      previousWidth=width;previousHeight=height;
+      // Safari's browser toolbar changes height during an ongoing touch.
+      // Rebase its anchor without discarding the finger or synthesizing release.
+      if(latest.current.options.gesture?.touch==="controlled"&&width===oldWidth&&gestures.hasPointer()){
+        if(dragActiveRef.current){
+          if(latest.current.orientation==="vertical"&&oldHeight>0)dragStartScrollRef.current*=height/oldHeight;
+          writePendingDrag();
+        }else{
+          if(latest.current.orientation==="vertical")viewport.scrollTop=latest.current.index*height;
+          else viewport.scrollLeft=latest.current.index*width;
+        }
+        scheduleMotion();return;
+      }
       gestures.reset();
       // Rotation settles an in-flight transition at the selected slide's new size.
       if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
@@ -791,7 +831,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       snapRestoreTimeoutRef.current = null;
       isNavigatingRef.current = false;
       latest.current.setIsAnimating(false);
-      viewport.style.scrollSnapType = latest.current.orientation === "vertical" ? "y mandatory" : "x mandatory";
+      viewport.style.scrollSnapType = latest.current.options.gesture?.touch === "controlled" ? "none" : latest.current.orientation === "vertical" ? "y mandatory" : "x mandatory";
       resizeSettlingUntil.current = Date.now() + 500;
       // Browser scroll-snap may move the viewport before the resize debounce.
       // Fence those scroll callbacks so rotation cannot replace a controlled URL.
@@ -821,7 +861,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
         // Only correct if significantly off (avoid fighting with scroll-snap)
         const currentScroll = orientation === 'vertical' ? viewport.scrollTop : viewport.scrollLeft;
-        if (Math.abs(currentScroll - targetScroll) > size * RESIZE_MISALIGNMENT_THRESHOLD) {
+        if (Math.abs(currentScroll - targetScroll) > (latest.current.options.gesture?.touch === "controlled" ? 1 : size * RESIZE_MISALIGNMENT_THRESHOLD)) {
           if (orientation === 'vertical') {
             viewport.scrollTop = targetScroll;
           } else {
@@ -845,7 +885,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         clearTimeout(resizeTimeoutRef.current);
       }
     };
-  }, [emitMotion, scheduleMotion, viewport, gestures.reset]);
+  }, [emitMotion, scheduleMotion, viewport, gestures.reset, gestures.hasPointer, writePendingDrag]);
 
   // Re-enable scroll-snap when user touches the screen
   const handleTouchStart = useCallback(() => {
@@ -860,17 +900,17 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   const handleTouchEnd = useCallback(() => {
     touchActiveRef.current = false;
     const { viewport, orientation } = latest.current;
-    if (viewport) viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
+    if (viewport) viewport.style.scrollSnapType = latest.current.options.gesture?.touch === 'controlled' ? 'none' : orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
   }, []);
 
   const getViewportProps = useCallback(() => {
     const virtualStyles: React.CSSProperties = {
       position: "relative",
-      overflow: "auto",
+      overflow: gestureCfg.touch === "controlled" ? "hidden" : "auto",
       overflowAnchor: "none",
       overscrollBehavior: "none",
       // Native Scroll Snap - handles touch swipe automatically
-      scrollSnapType: orientation === "vertical" ? "y mandatory" : "x mandatory",
+      scrollSnapType: gestureCfg.touch === "controlled" ? "none" : orientation === "vertical" ? "y mandatory" : "x mandatory",
       // Allow native touch scrolling - this works with scroll-snap for smooth swipe experience
       touchAction: gestureCfg.touch === "controlled"
         ? (orientation === "vertical" ? "pan-x pinch-zoom" : "pan-y pinch-zoom")
@@ -901,7 +941,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       // Use CSS viewport units for positioning - these automatically update on rotation!
       // This is much simpler and more reliable than trying to correct pixel offsets.
-      const sizeUnit = orientation === 'vertical' ? '100dvh' : '100dvw';
+      const sizeUnit = gestureCfg.touch === 'controlled' ? `${virtualizer.containerSize}px` : orientation === 'vertical' ? '100dvh' : '100dvw';
 
       return {
         ref: getItemRef(itemIndex),
@@ -923,7 +963,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         } satisfies React.CSSProperties,
       };
     },
-    [getItemRef, index, orientation],
+    [getItemRef, index, orientation, gestureCfg.touch, virtualizer.containerSize],
   );
 
   const prev = useCallback(() => navigateTo(latest.current.index - 1, "programmatic"), [navigateTo]);
