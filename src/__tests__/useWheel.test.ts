@@ -356,4 +356,20 @@ describe("useWheel", () => {
         fireWheelEvent(mockViewport, 20);
         expect(onRequestIndexChange).toHaveBeenCalledWith(1);
     });
+    it.each([[1, 3], [2, 1]])("normalizes deltaMode %s to viewport pixel navigation", (deltaMode, deltaY) => {
+        const onRequestIndexChange = vi.fn();
+        renderHook(() => useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,
+          threshold:35,debounce:100,onRequestIndexChange,viewport:mockViewport}));
+        mockViewport.dispatchEvent(new WheelEvent("wheel",{deltaMode,deltaY,bubbles:true,cancelable:true}));
+        expect(onRequestIndexChange).toHaveBeenCalledTimes(1);
+        expect(onRequestIndexChange).toHaveBeenCalledWith(1);
+    });
+    it("does not drag on zero primary-axis wheel events", () => {
+        const onRequestIndexChange=vi.fn(),onDragStart=vi.fn();
+        renderHook(() => useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,
+          threshold:35,debounce:100,onRequestIndexChange,onDragStart,viewport:mockViewport}));
+        fireWheelEvent(mockViewport,0,60);
+        expect(onDragStart).not.toHaveBeenCalled();
+        expect(onRequestIndexChange).not.toHaveBeenCalled();
+    });
 });

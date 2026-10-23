@@ -398,9 +398,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         snapRestoreTimeoutRef.current = null;
       }
 
-      // CRITICAL: Temporarily disable scroll-snap during programmatic navigation
-      // This prevents CSS from fighting with our scroll position
-      viewport.style.scrollSnapType = 'none';
+      // Keep snap enabled throughout navigation. Re-enabling it after a virtual
+      // window update can snap back to the previous item and suspend active media.
       viewport.style.scrollBehavior = 'auto';
 
       // Use instant scroll for wheel and programmatic navigation to avoid timing issues
@@ -469,18 +468,20 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     isNavigatingRef.current = true;
     navigationStartRef.current = Date.now();
     sourceRef.current = "programmatic";
-    const snap = viewport.style.scrollSnapType;
-    viewport.style.scrollSnapType = "none";
-    if (orientation === "vertical") viewport.scrollTop = target;
-    else viewport.scrollLeft = target;
+    // Keep snap enabled: toggling it can reselect the previously snapped slide
+    // after virtualization removes an earlier item, leaving active media offscreen.
+    const align = () => {
+      const offset = latest.current.index * (orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth);
+      viewport.scrollTo(orientation === "vertical" ? {top: offset, behavior:"instant"} : {left: offset, behavior:"instant"});
+    };
+    align();
     const frame = requestAnimationFrame(() => {
-      viewport.style.scrollSnapType = snap;
+      align();
       isNavigatingRef.current = false;
       sourceRef.current = "snap";
     });
     return () => {
       cancelAnimationFrame(frame);
-      viewport.style.scrollSnapType = snap;
       isNavigatingRef.current = false;
     };
   }, [index, isControlled, orientation, viewport, virtualizer.containerSize]);
@@ -741,6 +742,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     const virtualStyles: React.CSSProperties = {
       position: "relative",
       overflow: "auto",
+      overflowAnchor: "none",
       // Native Scroll Snap - handles touch swipe automatically
       scrollSnapType: orientation === "vertical" ? "y mandatory" : "x mandatory",
       // Allow native touch scrolling - this works with scroll-snap for smooth swipe experience

@@ -102,7 +102,11 @@ export function useWheel(params: UseWheelParams) {
         isInCooldown.current = false;
       }
 
-      const rawDelta = orientation === "vertical" ? evt.deltaY : evt.deltaX;
+      const unit = evt.deltaMode === 1 ? 16 : evt.deltaMode === 2
+        ? ((orientation === "vertical" ? element.clientHeight : element.clientWidth)
+          || (orientation === "vertical" ? window.innerHeight : window.innerWidth)) : 1;
+      const rawDelta = (orientation === "vertical" ? evt.deltaY : evt.deltaX) * unit;
+      if (!Number.isFinite(rawDelta) || rawDelta === 0) return;
       // RTL flips horizontal direction
       const adjusted = orientation === "horizontal" && direction === "rtl" ? -rawDelta : rawDelta;
 

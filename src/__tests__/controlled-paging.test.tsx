@@ -16,7 +16,11 @@ it('aligns a controlled deep link and an external index update without emitting 
  const view=render(ui(2));const viewport=view.getByRole('feed');
  expect(viewport.scrollTop).toBe(1200);
  view.rerender(ui(3));expect(viewport.scrollTop).toBe(1800);
- await act(async()=>{await new Promise(r=>setTimeout(r,30));});expect(onIndexChange).not.toHaveBeenCalled();
+ // Simulate a stale snap position while the virtual window reconciles.
+ viewport.scrollTop=1200;
+ await act(async()=>{await new Promise(r=>setTimeout(r,30));});expect(viewport.scrollTop).toBe(1800);expect(onIndexChange).not.toHaveBeenCalled();
  height.mockReturnValue(300);window.dispatchEvent(new Event('resize'));expect(viewport.scrollTop).toBe(900);
  await act(async()=>{await new Promise(r=>setTimeout(r,80));});expect(onIndexChange).not.toHaveBeenCalled();
+ act(()=>{viewport.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true}));});
+ expect(viewport.style.scrollSnapType).toBe('y mandatory');
 });
