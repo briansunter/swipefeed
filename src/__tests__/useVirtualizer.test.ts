@@ -264,3 +264,24 @@ describe("useVirtualizer", () => {
     Object.defineProperty(window, 'innerHeight', { writable: true, configurable: true, value: originalInnerHeight });
   });
 });
+
+it("invalidates cached item sizes when the viewport changes", () => {
+  const container=document.createElement("div");
+  const items=[0,1,2,3,4];
+  const {result,rerender}=renderHook(({height})=>{
+    Object.defineProperty(container,"clientHeight",{configurable:true,value:height});
+    return useVirtualizer({items,virtual:{overscan:1},getScrollElement:()=>container});
+  },{initialProps:{height:800}});
+  expect(result.current.totalSize).toBe(4000);
+  rerender({height:400});
+  expect(result.current.totalSize).toBe(2000);
+});
+
+it("retains the active media item while scroll geometry is being reconciled", () => {
+  const container=document.createElement("div");
+  Object.defineProperty(container,"clientHeight",{configurable:true,value:800});
+  const items=Array.from({length:100},(_,i)=>i);
+  const {result}=renderHook(()=>useVirtualizer({items,activeIndex:75,virtual:{overscan:1},getScrollElement:()=>container}));
+  expect(result.current.virtualItems.some(item=>item.index===75)).toBe(true);
+  expect(result.current.virtualItems.length).toBeLessThan(10);
+});

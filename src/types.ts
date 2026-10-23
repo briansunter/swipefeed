@@ -34,6 +34,18 @@ export interface SwipeDeckMotion {
 }
 
 export interface GestureConfig {
+  /** Disabling gestures cancels the current pointer before handing input to content. */
+  enabled?: boolean;
+  /** Controlled touch owns dragging and release; native leaves touch to the browser. */
+  touch?: "native" | "controlled";
+  /** Let a drag start on a link/button; taps and keyboard activation remain native. */
+  dragFromControls?: boolean;
+  /** Required drag distance as a fraction of viewport size, in addition to threshold. */
+  distanceRatio?: number;
+  /** Upper bound for the viewport-scaled release threshold, in pixels. */
+  maxThreshold?: number;
+  /** Minimum total movement before recent velocity can count as a flick. */
+  minFlickDistance?: number;
   threshold?: number;
   flickVelocity?: number;
   lockAxis?: boolean;
@@ -43,7 +55,9 @@ export interface GestureConfig {
 export interface WheelConfig {
   discretePaging?: boolean;
   threshold?: number;
+  /** Quiet interval between wheel sequences, including momentum. */
   debounce?: number;
+  /** Optional minimum between commits, never a momentum unlock timer. */
   cooldown?: number;
 }
 
@@ -67,6 +81,8 @@ export interface VisibilityConfig {
 }
 
 export interface VirtualConfig {
+  /** Retain lightweight native snap targets while virtualizing their media. */
+  retainSnapAnchors?: boolean;
   overscan?: number;
   estimatedSize?: number | ((item: unknown, index: number) => number);
   getItemKey?: (item: unknown, index: number) => string | number;
@@ -74,7 +90,11 @@ export interface VirtualConfig {
 
 export interface SwipeDeckOptions<T> {
   items: readonly T[];
+  /** Common ancestor for input on the deck and its fixed overlay controls. */
+  inputTarget?: HTMLElement | null;
   orientation?: Orientation;
+  /** Opt-in eased slide duration in milliseconds; reduced motion stays instant. */
+  transitionDuration?: number;
   direction?: Direction;
   defaultIndex?: number;
   index?: number;

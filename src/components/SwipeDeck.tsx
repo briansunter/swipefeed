@@ -38,6 +38,11 @@ export function SwipeDeck<T>(
   );
 
   const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
+  const visible = new Set(deck.virtualItems.map(item => item.index));
+  const retainedAnchors = useMemo(() => deck.items.map((item, index) =>
+    ({index, key: options.virtual?.getItemKey?.(item, index) ?? index})),
+    [deck.items, options.virtual?.getItemKey]);
+  const anchors = options.virtual?.retainSnapAnchors ? retainedAnchors : deck.virtualItems;
 
   /* Fullscreen styles if enabled */
   const fullscreenStyle: React.CSSProperties = props.fullscreen
@@ -59,14 +64,14 @@ export function SwipeDeck<T>(
     () => ({
       // Use CSS viewport units for total size - automatically updates on rotation!
       height: deck.orientation === "vertical"
-        ? `calc(${deck.items.length} * 100dvh)`
+        ? options.gesture?.touch === "controlled" ? deck.totalSize : `calc(${deck.items.length} * 100dvh)`
         : "100%",
       width: deck.orientation === "horizontal"
-        ? `calc(${deck.items.length} * 100dvw)`
+        ? options.gesture?.touch === "controlled" ? deck.totalSize : `calc(${deck.items.length} * 100dvw)`
         : "100%",
       position: "relative",
     }),
-    [deck.orientation, deck.items.length],
+    [deck.orientation, deck.items.length, deck.totalSize, options.gesture?.touch],
   );
 
   // Cast As to ElementType to avoid TS issues with polymorphic string/component
@@ -80,7 +85,7 @@ export function SwipeDeck<T>(
     >
       <div style={contentStyle}>
         {/* Use virtualItems for windowed rendering - only renders visible + overscan items */}
-        {deck.virtualItems.map((virtualItem) => {
+        {anchors.map((virtualItem) => {
           const itemIndex = virtualItem.index;
           const item = deck.items[itemIndex];
           if (!item) return null;
@@ -137,9 +142,9 @@ export function SwipeDeck<T>(
               {...itemProps}
               aria-label={`Item ${itemIndex + 1} of ${deck.items.length}`}
             >
-              <SwipeItemContext.Provider value={contextValue}>
+              {visible.has(itemIndex) && <SwipeItemContext.Provider value={contextValue}>
                 {children(contextValue)}
-              </SwipeItemContext.Provider>
+              </SwipeItemContext.Provider>}
             </article>
           );
         })}

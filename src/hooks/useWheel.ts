@@ -1,190 +1,104 @@
-import { useCallback, useRef, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Direction, Orientation } from "../types";
-import {
-  WHEEL_MAX_DELTA_ACCUMULATION,
-  WHEEL_MAX_VISUAL_DELTA,
-  WHEEL_FLICK_VELOCITY_THRESHOLD,
-  WHEEL_FLICK_DISTANCE_THRESHOLD,
-  WHEEL_VELOCITY_SMOOTHING_WEIGHT,
-} from "../constants";
+import { WHEEL_MAX_DELTA_ACCUMULATION, WHEEL_MAX_VISUAL_DELTA } from "../constants";
 
 export type UseWheelParams = {
   orientation: Orientation;
   direction: Direction;
   discretePaging: boolean;
+  enabled?: boolean;
+  canStart?: () => boolean;
   threshold: number;
+  /** Quiet interval that separates wheel sequences, including momentum. */
   debounce: number;
-  cooldown?: number; // Cooldown period after navigation (ms)
+  /** Optional minimum between commits; never rearms an ongoing sequence. */
+  cooldown?: number;
   onRequestIndexChange: (delta: 1 | -1) => void;
   viewport: HTMLElement | null;
   onDragStart?: () => void;
+  /** Total displacement since this sequence began, matching pointer dragging. */
   onDrag?: (delta: number) => void;
   onDragEnd?: () => void;
 };
 
-/**
- * Wheel handler supporting discrete paging (TikTok-like) or continuous tracking.
- * 
- * Aggressively prevents multi-video scrolling:
- * - Long cooldown period after each navigation
- * - Capped delta per event to prevent large jumps (smooths jerky mouse wheels)
- * - Direction locking during a scroll gesture
- */
+/** One sequence owns at most one page. Momentum extends the quiet deadline. */
 export function useWheel(params: UseWheelParams) {
-  const {
-    orientation,
-    direction,
-    discretePaging,
-    threshold,
-    debounce,
-    cooldown = 500,
-    onRequestIndexChange,
-    viewport,
-    onDragStart,
-    onDrag,
-    onDragEnd,
-  } = params;
+  const latest = useRef(params);
+  latest.current = params;
+  const state = useRef({ last: -Infinity, committedAt: -Infinity, consumed: false,
+    tracking: false, rejected: false, total: 0, visual: 0 });
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const endPreview = useCallback(() => {
+    const s = state.current;
+    const tracking = s.tracking;
+    s.tracking = false;
+    s.total = s.visual = 0;
+    if (tracking) latest.current.onDragEnd?.();
+  }, []);
+  const cancel = useCallback(() => {
+    state.current.consumed = true;
+    endPreview();
+  }, [endPreview]);
 
-  const accumulated = useRef(0);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastNavigationTime = useRef(0);
-  const isInCooldown = useRef(false);
-  const lastEventTime = useRef(0);
-  const gestureDirection = useRef<1 | -1 | null>(null);
-  const eventCount = useRef(0);
-  const isTracking = useRef(false);
-  const velocityRef = useRef(0);
-
-
-  const endGesture = useCallback(() => {
-    isTracking.current = false;
-    accumulated.current = 0;
-    gestureDirection.current = null;
-    eventCount.current = 0;
-    velocityRef.current = 0;
-    onDragEnd?.();
-  }, [onDragEnd]);
-
-  const resetAccumulated = useCallback(() => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => {
-      endGesture();
-    }, debounce);
-  }, [debounce, endGesture]);
-
+  useEffect(() => { if (params.enabled === false) cancel(); }, [params.enabled, cancel]);
   useEffect(() => {
-    const element = viewport;
+    const element = params.viewport;
     if (!element) return;
-
-    const onWheel = (evt: WheelEvent) => {
-      if (!discretePaging) return;
-
-      evt.preventDefault();
-      evt.stopPropagation();
-
-      const now = performance.now();
-
-      // Strict cooldown check - during cooldown, ignore events WITHOUT triggering snap
-      if (isInCooldown.current) {
-        if (now - lastNavigationTime.current < cooldown) {
-          // Reset tracking state WITHOUT calling onDragEnd (which triggers snap navigation)
-          // We don't want snap to fight with the navigation that just happened
-          if (isTracking.current) {
-            isTracking.current = false;
-            accumulated.current = 0;
-            gestureDirection.current = null;
-            eventCount.current = 0;
-            velocityRef.current = 0;
-            // NOTE: NOT calling onDragEnd here to avoid triggering snap
-          }
-          return;
-        }
-        isInCooldown.current = false;
+    const onWheel = (event: WheelEvent) => {
+      const p = latest.current, s = state.current;
+      if (!p.discretePaging || p.enabled === false || event.ctrlKey || event.metaKey) return;
+      if ((event.target as Element).closest?.('input,textarea,select,[contenteditable=true],[data-swipe-ignore],details[open]')) return;
+      const primary = p.orientation === 'vertical' ? event.deltaY : event.deltaX;
+      const cross = p.orientation === 'vertical' ? event.deltaX : event.deltaY;
+      if (!Number.isFinite(primary) || !Number.isFinite(cross) || (!primary && !cross)) return;
+      const now = performance.now(), quiet = Math.max(1, p.debounce);
+      if (now - s.last >= quiet) {
+        endPreview();
+        s.consumed = false;
+        s.rejected = Math.abs(cross) > Math.abs(primary);
       }
-
-      const rawDelta = orientation === "vertical" ? evt.deltaY : evt.deltaX;
-      // RTL flips horizontal direction
-      const adjusted = orientation === "horizontal" && direction === "rtl" ? -rawDelta : rawDelta;
-
-      // Determine scroll direction
-      const currentDirection: 1 | -1 = adjusted > 0 ? 1 : -1;
-
-      // Direction locking: reset if direction changes
-      if (gestureDirection.current !== null && gestureDirection.current !== currentDirection) {
-        accumulated.current = 0;
-        eventCount.current = 0;
+      s.last = now;
+      if (timer.current !== null) clearTimeout(timer.current);
+      // A committed sequence has no drag work left. This timer only settles a nudge.
+      timer.current = s.tracking || !s.consumed ? setTimeout(endPreview, quiet) : null;
+      if (s.rejected) return;
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      if (s.consumed) return;
+      if (p.canStart?.() === false || now - s.committedAt < (p.cooldown ?? 0)) {
+        cancel();
+        return;
       }
-      gestureDirection.current = currentDirection;
-
-      if (!isTracking.current) {
-        isTracking.current = true;
-        onDragStart?.();
-      }
-
-      // Calculate time since last event
-      const timeDelta = now - lastEventTime.current;
-      lastEventTime.current = now;
-      eventCount.current++;
-
-      // 1. Calculate delta for ACCUMULATION (Threshold Check)
-      // Allow fairly large steps so mouse wheel (100) triggers threshold quickly if repeated
-      const accumDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), WHEEL_MAX_DELTA_ACCUMULATION);
-
-      // 2. Calculate delta for VISUAL DRAG (Smoothing)
-      // Cap at WHEEL_MAX_VISUAL_DELTA so 100px jumps become 40px nudges
-      const visualDelta = Math.sign(adjusted) * Math.min(Math.abs(adjusted), WHEEL_MAX_VISUAL_DELTA);
-
-      // Flick detection velocity
-      const instantVelocity = (timeDelta > 0 && timeDelta < 100) ? Math.abs(accumDelta / timeDelta) : 0;
-      velocityRef.current = velocityRef.current * WHEEL_VELOCITY_SMOOTHING_WEIGHT + instantVelocity * (1 - WHEEL_VELOCITY_SMOOTHING_WEIGHT);
-
-      accumulated.current += accumDelta;
-
-      // Visual Tracking: Move the slide, but smoothed
-      onDrag?.(-visualDelta);
-
-      resetAccumulated();
-
-      const matchesThreshold = Math.abs(accumulated.current) >= threshold;
-      const isFlick = velocityRef.current > WHEEL_FLICK_VELOCITY_THRESHOLD && Math.abs(accumulated.current) > WHEEL_FLICK_DISTANCE_THRESHOLD;
-
-      if (matchesThreshold || isFlick) {
-        const navDelta: 1 | -1 = accumulated.current > 0 ? 1 : -1;
-
-        // Reset tracking state without calling onDragEnd
-        // onDragEnd is for when gesture ends WITHOUT navigation (snap back)
-        // Here we ARE navigating, so we skip onDragEnd to avoid a competing snap navigation
-        isTracking.current = false;
-        accumulated.current = 0;
-        gestureDirection.current = null;
-        eventCount.current = 0;
-        velocityRef.current = 0;
-
-        lastNavigationTime.current = now;
-        isInCooldown.current = true;
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-        onRequestIndexChange(navDelta);
-      }
+      const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2
+        ? ((p.orientation === 'vertical' ? element.clientHeight : element.clientWidth)
+          || (p.orientation === 'vertical' ? window.innerHeight : window.innerWidth)) : 1;
+      const delta = primary * unit * (p.orientation === 'horizontal' && p.direction === 'rtl' ? -1 : 1);
+      if (!delta) return;
+      if (!s.tracking) { s.tracking = true; p.onDragStart?.(); }
+      // Reversal subtracts from the preview; it does not open another sequence.
+      s.total += Math.sign(delta) * Math.min(Math.abs(delta), WHEEL_MAX_DELTA_ACCUMULATION);
+      s.visual += Math.sign(delta) * Math.min(Math.abs(delta), WHEEL_MAX_VISUAL_DELTA);
+      p.onDrag?.(-s.visual);
+      if (Math.abs(s.total) < p.threshold) return;
+      const direction = s.total > 0 ? 1 : -1;
+      s.consumed = true;
+      s.tracking = false;
+      s.total = s.visual = 0;
+      s.committedAt = now;
+      if (timer.current !== null) clearTimeout(timer.current);
+      timer.current = null;
+      p.onRequestIndexChange(direction);
     };
-
-    element.addEventListener("wheel", onWheel, { passive: false });
-
+    const hidden = () => { if (document.hidden) cancel(); };
+    element.addEventListener('wheel', onWheel, { passive: false });
+    window.addEventListener('blur', cancel);
+    document.addEventListener('visibilitychange', hidden);
     return () => {
-      element.removeEventListener("wheel", onWheel);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      element.removeEventListener('wheel', onWheel);
+      window.removeEventListener('blur', cancel);
+      document.removeEventListener('visibilitychange', hidden);
+      if (timer.current !== null) clearTimeout(timer.current);
     };
-  }, [
-    orientation,
-    direction,
-    discretePaging,
-    threshold,
-    // debounce, // REMOVED: Used in resetAccumulated, not here directly
-    cooldown,
-    onRequestIndexChange,
-    resetAccumulated,
-    viewport,
-    onDragStart,
-    onDrag
-  ]);
+  }, [params.viewport, cancel, endPreview]);
+  return { cancel };
 }

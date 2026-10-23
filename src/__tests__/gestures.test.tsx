@@ -188,8 +188,8 @@ describe("useGestures", () => {
       fireEvent.pointerCancel(target, { pointerId: 1 });
     });
 
-    // Index change should not happen after cancel
-    expect(onRequestIndexChange).not.toHaveBeenCalled();
+    // Cancellation requests a return to the original slide.
+    expect(onRequestIndexChange.mock.calls).toEqual([[0]]);
 
     // Verify drag state is reset
     expect(target.getAttribute("data-dragging")).toBe("false");
@@ -212,11 +212,12 @@ describe("useGestures", () => {
     act(() => {
       fireEvent.pointerDown(target, { clientY: 0, pointerId: 1 });
     });
-    expect(onDragStart).toHaveBeenCalled();
+    expect(onDragStart).not.toHaveBeenCalled();
 
     act(() => {
       fireEvent.pointerMove(target, { clientY: -20, pointerId: 1 });
     });
+    expect(onDragStart).toHaveBeenCalled();
     expect(onDrag).toHaveBeenCalledWith(-20, expect.anything());
 
     act(() => {
@@ -282,8 +283,8 @@ describe("useGestures", () => {
       fireEvent.pointerUp(target, { clientY: -5, pointerId: 1 });
     });
 
-    // With flickVelocity=0, any movement triggers, so just verify it was called
-    expect(onRequestIndexChange).toHaveBeenCalled();
+    // Movement below the directional slop remains a tap.
+    expect(onRequestIndexChange).not.toHaveBeenCalled();
   });
 
   it("onPointerMove early returns when lockAxis=false and not dragging", () => {

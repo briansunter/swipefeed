@@ -219,3 +219,25 @@ Key bits: render prop usage, shared-player synchronization through `onMotionChan
 ## Notes & limitations
 
 - Ensure your viewport has a defined size; virtualization, motion snapshots, and snap rely on it.
+
+### Shared input surface and wheel momentum
+
+For a feed with fixed captions or navigation outside the scrolling viewport, pass
+its common ancestor as `inputTarget`. Give that ancestor the same `touch-action`
+as controlled paging (`pan-x pinch-zoom` for a vertical deck). Input is registered
+once on that ancestor; the deck does not install a second pointer handler.
+
+`gesture.dragFromControls: true` lets a vertical drag begin on links, buttons and
+closed summaries. A real drag consumes its following click; ordinary taps and
+keyboard activation still work. Inputs, editable content, `[data-swipe-ignore]`
+and expanded descriptions retain their own interactions. Set
+`gesture.enabled: false` when handing input to embedded content; this also stops
+wheel paging.
+
+Wheel paging commits once per input sequence, including its momentum tail.
+`wheel.debounce` is the quiet interval before a fresh sequence (Process uses
+220 ms). `wheel.cooldown` is an optional minimum between commits, not a timer
+that unlocks a continuing fling. Process sets it to zero so a fresh sequence can
+interrupt settlement promptly. Small nudges settle back; pinch zoom and
+cross-axis sequences do not page. Browsers expose wheel deltas rather than a
+portable physical trackpad gesture ID, so a quiet interval defines the boundary.
