@@ -33,3 +33,20 @@ describe("useWheel", () => {
   });
 });
 
+
+it("keeps a wheel gesture listener stable while using the latest parent callbacks", () => {
+  const element=document.createElement("div");
+  const add=vi.spyOn(element,"addEventListener");
+  const remove=vi.spyOn(element,"removeEventListener");
+  const first=vi.fn(), second=vi.fn();
+  const {rerender,unmount}=renderHook(({callback})=>useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,threshold:35,debounce:100,viewport:element,onRequestIndexChange:callback,onDragEnd:()=>{}}),{initialProps:{callback:first}});
+  element.dispatchEvent(new WheelEvent("wheel",{deltaY:20}));
+  rerender({callback:second});
+  expect(add.mock.calls.filter(c=>c[0]==="wheel")).toHaveLength(1);
+  expect(remove.mock.calls.filter(c=>c[0]==="wheel")).toHaveLength(0);
+  element.dispatchEvent(new WheelEvent("wheel",{deltaY:20}));
+  expect(first).not.toHaveBeenCalled();
+  expect(second).toHaveBeenCalledWith(1);
+  unmount();
+  expect(remove.mock.calls.filter(c=>c[0]==="wheel")).toHaveLength(1);
+});

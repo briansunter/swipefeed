@@ -38,12 +38,12 @@ export function useWheel(params: UseWheelParams) {
     threshold,
     debounce,
     cooldown = 500,
-    onRequestIndexChange,
     viewport,
-    onDragStart,
-    onDrag,
-    onDragEnd,
   } = params;
+
+  // Keep the native listener installed across parent renders during a gesture.
+  const callbacks = useRef(params);
+  callbacks.current = params;
 
   const accumulated = useRef(0);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,8 +62,8 @@ export function useWheel(params: UseWheelParams) {
     gestureDirection.current = null;
     eventCount.current = 0;
     velocityRef.current = 0;
-    onDragEnd?.();
-  }, [onDragEnd]);
+    callbacks.current.onDragEnd?.();
+  }, []);
 
   const resetAccumulated = useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -118,7 +118,7 @@ export function useWheel(params: UseWheelParams) {
 
       if (!isTracking.current) {
         isTracking.current = true;
-        onDragStart?.();
+        callbacks.current.onDragStart?.();
       }
 
       // Calculate time since last event
@@ -141,7 +141,7 @@ export function useWheel(params: UseWheelParams) {
       accumulated.current += accumDelta;
 
       // Visual Tracking: Move the slide, but smoothed
-      onDrag?.(-visualDelta);
+      callbacks.current.onDrag?.(-visualDelta);
 
       resetAccumulated();
 
@@ -164,7 +164,7 @@ export function useWheel(params: UseWheelParams) {
         isInCooldown.current = true;
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-        onRequestIndexChange(navDelta);
+        callbacks.current.onRequestIndexChange(navDelta);
       }
     };
 
@@ -181,10 +181,7 @@ export function useWheel(params: UseWheelParams) {
     threshold,
     // debounce, // REMOVED: Used in resetAccumulated, not here directly
     cooldown,
-    onRequestIndexChange,
     resetAccumulated,
     viewport,
-    onDragStart,
-    onDrag
   ]);
 }

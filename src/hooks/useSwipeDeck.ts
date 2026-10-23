@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type React from "react";
 import { clamp } from "../utils/clamp";
 import { prefersReducedMotion } from "../utils/prefersReducedMotion";
@@ -159,7 +159,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     (nextIndex: number) => {
       const { index, isControlled, options, setInternalIndex, setIsAnimating } = latest.current;
       if (nextIndex === index) {
-        // Already at this index, no need to update
+        // A settled controlled navigation still needs to release gesture state.
+        setIsAnimating(false);
         return;
       }
       if (!isControlled) setInternalIndex(nextIndex);
@@ -421,6 +422,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // Handler to restore scroll-snap after navigation completes
       const handleScrollEnd = () => {
         isNavigatingRef.current = false;
+        latest.current.setIsAnimating(false);
         if (snapRestoreTimeoutRef.current) {
           clearTimeout(snapRestoreTimeoutRef.current);
           snapRestoreTimeoutRef.current = null;
@@ -450,6 +452,35 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     },
     []
   );
+
+  // Controlled indexes can change through routing, deep links or list updates,
+  // without navigateTo(). Align before scroll observers can publish the old index.
+  useLayoutEffect(() => {
+    if (!viewport || !isControlled) return;
+    if (isNavigatingRef.current && lastNavigationIndexRef.current === index) return;
+    const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+    if (size <= 0) return;
+    const target = index * size;
+    const current = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+    if (Math.abs(current - target) < 1) return;
+    isNavigatingRef.current = true;
+    navigationStartRef.current = Date.now();
+    sourceRef.current = "programmatic";
+    const snap = viewport.style.scrollSnapType;
+    viewport.style.scrollSnapType = "none";
+    if (orientation === "vertical") viewport.scrollTop = target;
+    else viewport.scrollLeft = target;
+    const frame = requestAnimationFrame(() => {
+      viewport.style.scrollSnapType = snap;
+      isNavigatingRef.current = false;
+      sourceRef.current = "snap";
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      viewport.style.scrollSnapType = snap;
+      isNavigatingRef.current = false;
+    };
+  }, [index, isControlled, orientation, viewport, virtualizer.containerSize]);
 
   const onDragStart = useCallback(() => {
     const { viewport, orientation } = latest.current;
@@ -634,6 +665,17 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     if (!viewport) return;
 
     const handleResize = () => {
+      // Browser scroll-snap may move the viewport before the resize debounce.
+      // Fence those scroll callbacks so rotation cannot replace a controlled URL.
+      const current = latest.current;
+      const size = current.orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+      const offset = current.orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+      if (Math.abs(offset - current.index * size) < 1) { scheduleMotion(); return; }
+      isNavigatingRef.current = true;
+      navigationStartRef.current = Date.now();
+      sourceRef.current = "programmatic";
+      if (current.orientation === "vertical") viewport.scrollTop = current.index * size;
+      else viewport.scrollLeft = current.index * size;
       scheduleMotion();
 
       // Clear any pending correction
@@ -658,15 +700,19 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
             viewport.scrollLeft = targetScroll;
           }
         }
+        isNavigatingRef.current = false;
+        sourceRef.current = "snap";
         emitMotion();
       }, RESIZE_CORRECTION_DEBOUNCE_MS);
     };
 
     const resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(viewport);
+    window.addEventListener("resize", handleResize);
 
     return () => {
       resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
       if (resizeTimeoutRef.current) {
         clearTimeout(resizeTimeoutRef.current);
       }
