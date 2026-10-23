@@ -417,7 +417,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       const viewportSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
       const remaining = Math.abs(next * viewportSize - (orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft));
       const duration = source === "user:gesture" && baseDuration > 0
-        ? Math.min(baseDuration, Math.max(120, baseDuration * Math.sqrt(remaining / Math.max(1, viewportSize)))) : baseDuration;
+        ? Math.min(260,baseDuration, Math.max(100, baseDuration * Math.sqrt(remaining / Math.max(1, viewportSize)))) : baseDuration;
       if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
       alignmentRafRef.current = null;
       if (duration > 0 && behavior !== "instant" && !prefersReducedMotion()) {
@@ -575,28 +575,32 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     dragStartScrollRef.current = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
   }, []);
 
+  const writePendingDrag=useCallback(()=>{
+    const {viewport,orientation,index,items}=latest.current;
+    if(!viewport)return;
+    const size=orientation==="vertical"?viewport.clientHeight:viewport.clientWidth;
+    const offset=clamp(dragStartScrollRef.current-pendingDragRef.current,
+      Math.max(0,(index-1)*size),Math.min((items.length-1)*size,(index+1)*size));
+    if(orientation==="vertical")viewport.scrollTop=offset;
+    else viewport.scrollLeft=offset;
+    scheduleMotion();
+  },[scheduleMotion]);
   const onDrag = useCallback((delta: number) => {
     pendingDragRef.current = delta;
     if (dragRafRef.current !== null) return;
     dragRafRef.current = requestAnimationFrame(() => {
       dragRafRef.current = null;
-      const { viewport, orientation, index, items } = latest.current;
-      if (!viewport) return;
-      const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
-      // A gesture can reveal at most one neighbor, even with a very long drag.
-      const offset = clamp(dragStartScrollRef.current - pendingDragRef.current,
-        Math.max(0,(index-1)*size), Math.min((items.length-1)*size,(index+1)*size));
-      if (orientation === "vertical") viewport.scrollTop=offset;
-      else viewport.scrollLeft=offset;
-      scheduleMotion();
+      writePendingDrag();
     });
-  }, [scheduleMotion]);
+  }, [writePendingDrag]);
 
   const onDragEnd = useCallback(() => {
+    // Apply the final input sample before release physics takes ownership.
+    if(dragActiveRef.current&&dragRafRef.current!==null)writePendingDrag();
     if (dragRafRef.current !== null) cancelAnimationFrame(dragRafRef.current);
     dragRafRef.current = null;
     dragActiveRef.current = false;
-  }, []);
+  }, [writePendingDrag]);
 
   // Calculate target index from current scroll position (for snap correction)
   const getSnapTargetIndex = useCallback(() => {
@@ -635,12 +639,14 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   });
 
   const gestures = useGestures({
+    enabled:gestureCfg.enabled,
     orientation,
     direction,
     threshold: gestureCfg.threshold ?? 50,
     flickVelocity: gestureCfg.flickVelocity ?? 0.5,
     minFlickDistance: gestureCfg.minFlickDistance,
     distanceRatio: gestureCfg.distanceRatio,
+    maxThreshold: gestureCfg.maxThreshold,
     controlledTouch: gestureCfg.touch === "controlled",
     viewportSize: () => latest.current.viewport ? (latest.current.orientation === "vertical" ? latest.current.viewport.clientHeight : latest.current.viewport.clientWidth) : 0,
     lockAxis: gestureCfg.lockAxis ?? true,

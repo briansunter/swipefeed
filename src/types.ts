@@ -34,10 +34,14 @@ export interface SwipeDeckMotion {
 }
 
 export interface GestureConfig {
+  /** Disabling gestures cancels the current pointer before handing input to content. */
+  enabled?: boolean;
   /** Controlled touch owns dragging and release; native leaves touch to the browser. */
   touch?: "native" | "controlled";
   /** Required drag distance as a fraction of viewport size, in addition to threshold. */
   distanceRatio?: number;
+  /** Upper bound for the viewport-scaled release threshold, in pixels. */
+  maxThreshold?: number;
   /** Minimum total movement before recent velocity can count as a flick. */
   minFlickDistance?: number;
   threshold?: number;

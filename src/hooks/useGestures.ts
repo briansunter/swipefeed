@@ -1,14 +1,16 @@
-import { useCallback, useRef, useState, useMemo } from "react";
+import { useCallback, useRef, useState, useMemo, useEffect } from "react";
 import { clamp } from "../utils/clamp";
 import type { Direction, Orientation } from "../types";
 
 type UseGesturesParams = {
+  enabled?:boolean;
   orientation: Orientation;
   direction: Direction;
   threshold: number;
   flickVelocity: number;
   minFlickDistance?: number;
   distanceRatio?: number;
+  maxThreshold?: number;
   viewportSize?: () => number;
   controlledTouch?: boolean;
   lockAxis: boolean;
@@ -25,6 +27,14 @@ type UseGesturesParams = {
 };
 
 type Sample = {position: number; time: number};
+type InputPoint = {clientX:number;clientY:number;timeStamp:number};
+function inputTime(event:{timeStamp:number}) {
+  const now=performance.now();
+  let time=event.timeStamp;
+  // WebKit versions may use epoch milliseconds instead of the performance clock.
+  if(time>1e12)time-=performance.timeOrigin;
+  return Number.isFinite(time)&&time>0&&time<=now+1000?time:now;
+}
 export function useGestures(params: UseGesturesParams) {
   const latest = useRef(params);
   latest.current = params;
@@ -33,7 +43,7 @@ export function useGestures(params: UseGesturesParams) {
     pointer: number; start: number; cross: number; delta: number;
     index: number; started: boolean; rejected: boolean; samples: Sample[];
   } | null>(null);
-  const coord = (evt: React.PointerEvent, primary: boolean) =>
+  const coord = (evt: InputPoint, primary: boolean) =>
     (latest.current.orientation === "vertical") === primary ? evt.clientY : evt.clientX;
 
   const reset = useCallback(() => {
@@ -43,18 +53,29 @@ export function useGestures(params: UseGesturesParams) {
     latest.current.onDragEnd?.();
   }, []);
 
-  const finish = useCallback((cancelled: boolean) => {
+  const finish = useCallback((cancelled: boolean, now=performance.now()) => {
     const s = state.current, p = latest.current;
     if (!s) return;
     if (!s.started) { reset(); return; }
-    const now = performance.now();
-    // Recent movement matters. A fast drag followed by a hold is not a flick.
-    const recent = s.samples.filter(v => now - v.time <= 100);
-    const first = recent[0], last = recent.at(-1);
-    const velocity = first && last && last.time > first.time
-      ? (last.position - first.position) / (last.time - first.time) : 0;
+    const last=s.samples.at(-1)!;
+    const cutoff=now-100;
+    let first=s.samples[0];
+    let following:Sample|undefined;
+    for(let i=1;i<s.samples.length;i++){
+      if(s.samples[i].time<=cutoff)first=s.samples[i];
+      else {following=s.samples[i];break;}
+    }
+    if(first.time<cutoff&&following&&following.time>first.time){
+      const ratio=clamp((cutoff-first.time)/(following.time-first.time),0,1);
+      first={position:first.position+(following.position-first.position)*ratio,time:cutoff};
+    }
+    // Use actual input timing and retain the last movement through a quick lift.
+    // A stationary hold expires momentum; handler delays do not erase a flick.
+    const velocity=now-last.time<120&&last.time>first.time
+      ?(last.position-first.position)/(last.time-first.time):0;
     const distance = Math.abs(s.delta);
-    const threshold = Math.max(p.threshold, (p.viewportSize?.() ?? 0) * (p.distanceRatio ?? 0));
+    const threshold = Math.min(p.maxThreshold??Infinity,
+      Math.max(p.threshold, (p.viewportSize?.() ?? 0) * (p.distanceRatio ?? 0)));
     const flick = distance >= (p.minFlickDistance ?? 24)
       && Math.abs(velocity) >= p.flickVelocity && Math.sign(velocity) === Math.sign(s.delta);
     const forward = p.orientation === "horizontal" && p.direction === "rtl" ? s.delta > 0 : s.delta < 0;
@@ -66,40 +87,57 @@ export function useGestures(params: UseGesturesParams) {
     p.onRequestIndexChange(next);
   }, [reset]);
 
+  useEffect(()=>{if(params.enabled===false)finish(true);},[params.enabled,finish]);
+
   const onPointerDown = useCallback((evt: React.PointerEvent) => {
     const p = latest.current;
     // Native touch and a JS pointer drag must never move the same viewport.
+    if(p.enabled===false)return;
     if (evt.pointerType === "touch" && !p.controlledTouch) return;
     if (evt.isPrimary === false || evt.button !== 0 || state.current) return;
     if (p.ignoreWhileAnimating && p.isAnimating && !p.controlledTouch) return;
     if ((evt.target as Element).closest?.("a,button,input,textarea,select,summary,[contenteditable=true],[data-swipe-ignore]")) return;
     state.current = {pointer:evt.pointerId,start:coord(evt,true),cross:coord(evt,false),delta:0,
-      index:p.getIndex(),started:false,rejected:false,samples:[{position:coord(evt,true),time:performance.now()}]};
+      index:p.getIndex(),started:false,rejected:false,samples:[{position:coord(evt,true),time:inputTime(evt)}]};
   }, []);
 
-  const onPointerMove = useCallback((evt: React.PointerEvent) => {
+  const updateDrag = useCallback((evt: React.PointerEvent, final=false) => {
     const s = state.current, p = latest.current;
     if (!s || evt.pointerId !== s.pointer || s.rejected) return;
+    if(p.enabled===false){finish(true);return;}
     const position = coord(evt,true), delta = position - s.start;
     if (!s.started) {
       const cross = Math.abs(coord(evt,false)-s.cross);
       if (Math.max(Math.abs(delta),cross) < 8) return;
       if (p.lockAxis && cross > Math.abs(delta)) { s.rejected=true; return; }
       s.started=true;
-      evt.currentTarget.setPointerCapture?.(evt.pointerId);
+      if(!final){try {evt.currentTarget.setPointerCapture?.(evt.pointerId);} catch {}}
       setIsDragging(true);
       p.onDragStart?.(evt);
     }
     s.delta=delta;
-    const now=performance.now();
-    s.samples.push({position,time:now});
-    s.samples=s.samples.filter(v=>now-v.time<=120);
+    const record=(point:InputPoint,stationary=false)=>{
+      const time=inputTime(point),position=coord(point,true),last=s.samples.at(-1)!;
+      if(time<last.time||(!stationary&&position===last.position))return;
+      if(time===last.time)s.samples[s.samples.length-1]={position,time};
+      else s.samples.push({position,time});
+      while(s.samples.length>2&&s.samples[1].time<time-140)s.samples.shift();
+      if(s.samples.length>64)s.samples.splice(1,s.samples.length-64);
+    };
+    const native=evt.nativeEvent;
+    for(const point of native.getCoalescedEvents?.()??[])record(point,true);
+    record(evt,!final);
     if (evt.cancelable) evt.preventDefault();
     p.onDrag?.(delta,evt);
   }, []);
+  const onPointerMove=useCallback((evt:React.PointerEvent)=>updateDrag(evt),[updateDrag]);
   const onPointerUp = useCallback((evt: React.PointerEvent) => {
-    if (evt.pointerId === state.current?.pointer) finish(false);
-  }, [finish]);
+    if (evt.pointerId !== state.current?.pointer)return;
+    if(latest.current.enabled===false){finish(true,inputTime(evt));return;}
+    // The final coordinate may be newer than every delivered pointermove.
+    updateDrag(evt,true);
+    finish(false,inputTime(evt));
+  }, [finish,updateDrag]);
   const onPointerCancel = useCallback((evt: React.PointerEvent) => {
     if (evt.pointerId === state.current?.pointer) finish(true);
   }, [finish]);
