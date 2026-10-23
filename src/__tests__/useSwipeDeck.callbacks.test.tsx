@@ -379,7 +379,7 @@ describe("SwipeDeck component unit tests", () => {
         vi.useRealTimers();
     });
 
-    it("handleTouchStart with horizontal orientation sets correct snap type", () => {
+    it("defers horizontal snap until a native touch ends", () => {
         render(
             <SwipeDeck items={[{ id: "1" }]} orientation="horizontal">
                 {({ item, props }) => <div {...props}>{item.id}</div>}
@@ -392,8 +392,10 @@ describe("SwipeDeck component unit tests", () => {
             fireEvent.touchStart(viewport);
         });
 
-        // Should set horizontal snap type
-        expect(viewport.style.scrollSnapType).toContain("x");
+        // Keep the viewport under the finger until release.
+        expect(viewport.style.scrollSnapType).toBe("none");
+        act(() => { fireEvent.touchEnd(viewport); });
+        expect(viewport.style.scrollSnapType).toBe("x mandatory");
     });
 
     it("does not trigger change when navigating to same index", () => {

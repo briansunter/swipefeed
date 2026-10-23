@@ -77,6 +77,8 @@ export interface VirtualConfig {
 export interface SwipeDeckOptions<T> {
   items: readonly T[];
   orientation?: Orientation;
+  /** Opt-in eased slide duration in milliseconds; reduced motion stays instant. */
+  transitionDuration?: number;
   direction?: Direction;
   defaultIndex?: number;
   index?: number;

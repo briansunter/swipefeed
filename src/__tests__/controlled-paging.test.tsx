@@ -43,3 +43,25 @@ it('retains native snap anchors while bounding media to the virtual range',()=>{
  expect(viewport.querySelector('article[data-index="20"] [data-art]')?.textContent).toBe('20');
  expect(viewport.querySelectorAll('[data-art]').length).toBeLessThan(10);
 });
+
+it('does not jump to a boundary when a parent acknowledges a native finger scroll',async()=>{
+ vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
+ vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>setTimeout(()=>fn(performance.now()),0));
+ vi.stubGlobal('cancelAnimationFrame',(id:number)=>clearTimeout(id));
+ vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(600);
+ vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(400);
+ Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:function(opts:ScrollToOptions){this.scrollTop=opts.top||0;}});
+ const changed=vi.fn(),items=['a','b','c'];
+ const ui=(index:number)=><SwipeDeck items={items} index={index} onIndexChange={changed}>{({item})=><div>{item}</div>}</SwipeDeck>;
+ const view=render(ui(0)),viewport=view.getByRole('feed');
+ act(()=>viewport.dispatchEvent(new Event('touchstart',{bubbles:true})));
+ expect(viewport.style.scrollSnapType).toBe('none');
+ viewport.scrollTop=350;act(()=>viewport.dispatchEvent(new Event('scroll')));
+ await act(async()=>{await new Promise(r=>setTimeout(r,20));});
+ expect(changed).toHaveBeenCalledWith(1,'snap');
+ view.rerender(ui(1));expect(viewport.scrollTop).toBe(350);
+ await act(async()=>{await new Promise(r=>setTimeout(r,220));});
+ expect(viewport.scrollTop).toBe(350);
+ act(()=>viewport.dispatchEvent(new Event('touchend',{bubbles:true})));
+ expect(viewport.style.scrollSnapType).toBe('y mandatory');
+});

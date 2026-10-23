@@ -98,6 +98,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   // Use state for viewport to ensure hooks like useVirtualizer/useWheel know when it's ready
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
 
+  const touchActiveRef = useRef(false);
+  const nativeIndexRef = useRef<number | null>(null);
   const alignmentRafRef = useRef<number | null>(null);
   const sourceRef = useRef<IndexChangeSource>("snap");
   const resizeSettlingUntil = useRef(0);
@@ -168,6 +170,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         return;
       }
       if (!isControlled) setInternalIndex(nextIndex);
+      nativeIndexRef.current = nextIndex;
       options.onIndexChange?.(nextIndex, sourceRef.current ?? "snap");
       setIsAnimating(false);
       sourceRef.current = "snap";
@@ -383,6 +386,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
       // Mark as navigating to prevent handleScroll from interfering
       isNavigatingRef.current = true;
+      navigationStartRef.current = Date.now();
 
       // Update index immediately
       if (!isControlled) setInternalIndex(next);
@@ -403,11 +407,54 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // window update can snap back to the previous item and suspend active media.
       viewport.style.scrollBehavior = 'auto';
 
+      const duration = Math.min(700, Math.max(0, options.transitionDuration ?? 0));
+      if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
+      alignmentRafRef.current = null;
+      if (duration > 0 && behavior !== "instant" && !prefersReducedMotion()) {
+        const from = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+        const target = next * (orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth);
+        const started = performance.now();
+        let completed = false;
+        viewport.style.scrollSnapType = "none";
+        latest.current.setIsAnimating(true);
+        const write = (offset: number) => viewport.scrollTo(orientation === "vertical"
+          ? {top:offset,behavior:"instant"} : {left:offset,behavior:"instant"});
+        const finish = () => {
+          if (completed || lastNavigationIndexRef.current !== next) return;
+          completed = true;
+          if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
+          if (snapRestoreTimeoutRef.current) clearTimeout(snapRestoreTimeoutRef.current);
+          snapRestoreTimeoutRef.current = null;
+          write(target);
+          viewport.style.scrollSnapType = orientation === "vertical" ? "y mandatory" : "x mandatory";
+          // Reconcile after compositor snapping without shortening the animation.
+          alignmentRafRef.current = requestAnimationFrame(() => {
+            alignmentRafRef.current = null;
+            if (lastNavigationIndexRef.current === next) write(target);
+            isNavigatingRef.current = false;
+            latest.current.setIsAnimating(false);
+            sourceRef.current = "snap";
+            emitMotion();
+          });
+        };
+        const tick = (now: number) => {
+          if (completed || lastNavigationIndexRef.current !== next) return;
+          const progress = clamp((now - started) / duration, 0, 1);
+          write(from + (target - from) * (1 - Math.pow(1 - progress, 3)));
+          scheduleMotion();
+          if (progress < 1) alignmentRafRef.current = requestAnimationFrame(tick);
+          else finish();
+        };
+        alignmentRafRef.current = requestAnimationFrame(tick);
+        snapRestoreTimeoutRef.current = setTimeout(finish, duration + 150);
+        return;
+      }
+
       // Use instant scroll for wheel and programmatic navigation to avoid timing issues
       // Smooth scroll can cause scrollend to fire late, keeping isNavigatingRef stuck
       // Only gestures get smooth scroll since they have visual drag feedback
-      const targetBehavior = behavior ?? (
-        source === "user:wheel" || source === "programmatic" || prefersReducedMotion() ? "instant" : "smooth"
+      const targetBehavior = prefersReducedMotion() ? "instant" : behavior ?? (
+        source === "user:wheel" || source === "programmatic" ? "instant" : "smooth"
       );
 
       // Manual scroll calculation
@@ -425,7 +472,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // A compositor wheel snap can overwrite a synchronous scrollTo after the
       // handler returns. Verify the requested position outside that wheel task.
       if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
-      alignmentRafRef.current = requestAnimationFrame(() => {
+      alignmentRafRef.current = targetBehavior === "smooth" ? null : requestAnimationFrame(() => {
         alignmentRafRef.current = null;
         if (lastNavigationIndexRef.current !== next) return;
         const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
@@ -474,6 +521,9 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   // without navigateTo(). Align before scroll observers can publish the old index.
   useLayoutEffect(() => {
     if (!viewport || !isControlled) return;
+    // A controlled acknowledgment of native scrolling is not an external jump.
+    // Let the finger continue moving the viewport until native snap settles it.
+    if (nativeIndexRef.current === index) { nativeIndexRef.current = null; return; }
     if (isNavigatingRef.current && lastNavigationIndexRef.current === index) return;
     const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
     if (size <= 0) return;
@@ -600,7 +650,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     // Safety Snap: If scrolling stops and we are misaligned, snap to current index
     if (scrollEndTimeoutRef.current) clearTimeout(scrollEndTimeoutRef.current);
     scrollEndTimeoutRef.current = setTimeout(() => {
-      if (isNavigatingRef.current) return;
+      if (isNavigatingRef.current || touchActiveRef.current) return;
       const { viewport, orientation, index } = latest.current;
       if (!viewport) return;
 
@@ -691,6 +741,14 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     if (!viewport) return;
 
     const handleResize = () => {
+      // Rotation settles an in-flight transition at the selected slide's new size.
+      if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
+      alignmentRafRef.current = null;
+      if (snapRestoreTimeoutRef.current) clearTimeout(snapRestoreTimeoutRef.current);
+      snapRestoreTimeoutRef.current = null;
+      isNavigatingRef.current = false;
+      latest.current.setIsAnimating(false);
+      viewport.style.scrollSnapType = latest.current.orientation === "vertical" ? "y mandatory" : "x mandatory";
       resizeSettlingUntil.current = Date.now() + 500;
       // Browser scroll-snap may move the viewport before the resize debounce.
       // Fence those scroll callbacks so rotation cannot replace a controlled URL.
@@ -748,10 +806,18 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
 
   // Re-enable scroll-snap when user touches the screen
   const handleTouchStart = useCallback(() => {
+    touchActiveRef.current = true;
     const { viewport, orientation } = latest.current;
     if (viewport) {
-      viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
+      // DOM updates during a native drag can make the browser re-snap early.
+      viewport.style.scrollSnapType = 'none';
     }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    touchActiveRef.current = false;
+    const { viewport, orientation } = latest.current;
+    if (viewport) viewport.style.scrollSnapType = orientation === 'vertical' ? 'y mandatory' : 'x mandatory';
   }, []);
 
   const getViewportProps = useCallback(() => {
@@ -776,10 +842,12 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       // onWheel: wheel.onWheel, // REMOVED: Managed internally by useWheel
       onKeyDown: keyboardCfg.global ? undefined : keyboard.onKeyDown,
       onTouchStart: handleTouchStart,
+      onTouchEnd: handleTouchEnd,
+      onTouchCancel: handleTouchEnd,
       ...gestures.handlers,
       style: virtualStyles,
     } satisfies React.HTMLAttributes<HTMLElement> & { ref: React.RefCallback<HTMLElement> };
-  }, [ariaLabel, handleScroll, handleTouchStart, isAnimating, keyboard.onKeyDown, keyboardCfg.global, orientation, gestures.handlers]);
+  }, [ariaLabel, handleScroll, handleTouchStart, handleTouchEnd, isAnimating, keyboard.onKeyDown, keyboardCfg.global, orientation, gestures.handlers]);
 
   const getItemProps = useCallback(
     (itemIndex: number) => {
