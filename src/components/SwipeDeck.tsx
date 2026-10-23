@@ -38,6 +38,10 @@ export function SwipeDeck<T>(
   );
 
   const { style: virtualStyle, ...restViewportProps } = deck.getViewportProps();
+  const visible = new Set(deck.virtualItems.map(item => item.index));
+  const anchors = options.virtual?.retainSnapAnchors
+    ? deck.items.map((item, index) => ({index, key: options.virtual?.getItemKey?.(item, index) ?? index}))
+    : deck.virtualItems;
 
   /* Fullscreen styles if enabled */
   const fullscreenStyle: React.CSSProperties = props.fullscreen
@@ -80,7 +84,7 @@ export function SwipeDeck<T>(
     >
       <div style={contentStyle}>
         {/* Use virtualItems for windowed rendering - only renders visible + overscan items */}
-        {deck.virtualItems.map((virtualItem) => {
+        {anchors.map((virtualItem) => {
           const itemIndex = virtualItem.index;
           const item = deck.items[itemIndex];
           if (!item) return null;
@@ -137,9 +141,9 @@ export function SwipeDeck<T>(
               {...itemProps}
               aria-label={`Item ${itemIndex + 1} of ${deck.items.length}`}
             >
-              <SwipeItemContext.Provider value={contextValue}>
+              {visible.has(itemIndex) && <SwipeItemContext.Provider value={contextValue}>
                 {children(contextValue)}
-              </SwipeItemContext.Provider>
+              </SwipeItemContext.Provider>}
             </article>
           );
         })}

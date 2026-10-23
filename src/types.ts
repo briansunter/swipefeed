@@ -67,6 +67,8 @@ export interface VisibilityConfig {
 }
 
 export interface VirtualConfig {
+  /** Retain lightweight native snap targets while virtualizing their media. */
+  retainSnapAnchors?: boolean;
   overscan?: number;
   estimatedSize?: number | ((item: unknown, index: number) => number);
   getItemKey?: (item: unknown, index: number) => string | number;

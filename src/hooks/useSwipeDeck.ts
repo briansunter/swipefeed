@@ -98,6 +98,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   // Use state for viewport to ensure hooks like useVirtualizer/useWheel know when it's ready
   const [viewport, setViewport] = useState<HTMLElement | null>(null);
 
+  const alignmentRafRef = useRef<number | null>(null);
   const sourceRef = useRef<IndexChangeSource>("snap");
   const resizeSettlingUntil = useRef(0);
   const dragStartScrollRef = useRef<number>(0);
@@ -421,6 +422,20 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         viewport.scrollTo({ left: targetScroll, behavior: targetBehavior });
       }
 
+      // A compositor wheel snap can overwrite a synchronous scrollTo after the
+      // handler returns. Verify the requested position outside that wheel task.
+      if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
+      alignmentRafRef.current = requestAnimationFrame(() => {
+        alignmentRafRef.current = null;
+        if (lastNavigationIndexRef.current !== next) return;
+        const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+        const offset = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
+        if (Math.abs(offset - next * size) > 1) {
+          viewport.scrollTo(orientation === "vertical"
+            ? {top:next * size,behavior:"instant"} : {left:next * size,behavior:"instant"});
+        }
+      });
+
       // Handler to restore scroll-snap after navigation completes
       const handleScrollEnd = () => {
         isNavigatingRef.current = false;
@@ -638,6 +653,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     if (scrollEndTimeoutRef.current) clearTimeout(scrollEndTimeoutRef.current);
     if (snapRestoreTimeoutRef.current) clearTimeout(snapRestoreTimeoutRef.current);
     if (rafId.current !== null) cancelAnimationFrame(rafId.current);
+    if (alignmentRafRef.current !== null) cancelAnimationFrame(alignmentRafRef.current);
   }, []);
 
   // onEndReached
