@@ -38,7 +38,7 @@ describe("useWheel tracking", () => {
         }));
 
         // 1. Start gesture
-        const event1 = new WheelEvent("wheel", { deltaY: 20 });
+        const event1 = new WheelEvent("wheel", { deltaY: 20, cancelable: true });
         Object.defineProperty(event1, 'preventDefault', { value: vi.fn(), writable: true });
         element.dispatchEvent(event1);
 
@@ -56,7 +56,7 @@ describe("useWheel tracking", () => {
 
         expect(onDragStart).toHaveBeenCalledTimes(1); // Should not call again
         expect(onDrag).toHaveBeenCalledTimes(2);
-        expect(onDrag).toHaveBeenLastCalledWith(-30);
+        expect(onDrag).toHaveBeenLastCalledWith(-50);
 
         // 3. End gesture (timeout)
         now += 150; // > debounce

@@ -250,7 +250,7 @@ describe("useWheel", () => {
         expect(onRequestIndexChange).not.toHaveBeenCalled();
     });
 
-    it("resets accumulation on direction change", () => {
+    it("reversal first unwinds the accumulated displacement", () => {
         const onRequestIndexChange = vi.fn();
         let mockTime = 0;
         vi.spyOn(performance, "now").mockImplementation(() => mockTime);
@@ -273,7 +273,7 @@ describe("useWheel", () => {
 
         mockTime += 50; // within debounce
 
-        // Change direction (scroll up) - should reset accumulation
+        // Reverse back to the start before accumulating in the other direction
         fireWheelEvent(mockViewport, -40);
         expect(onRequestIndexChange).not.toHaveBeenCalled();
 
@@ -284,7 +284,10 @@ describe("useWheel", () => {
 
         mockTime += 50;
         fireWheelEvent(mockViewport, -40);
-        // Now accumulated enough
+        // Net displacement is only -80, so wait for deliberate movement.
+        expect(onRequestIndexChange).not.toHaveBeenCalled();
+        mockTime += 50;
+        fireWheelEvent(mockViewport, -40);
         expect(onRequestIndexChange).toHaveBeenCalledWith(-1);
     });
 
@@ -355,5 +358,21 @@ describe("useWheel", () => {
 
         fireWheelEvent(mockViewport, 20);
         expect(onRequestIndexChange).toHaveBeenCalledWith(1);
+    });
+    it.each([[1, 3], [2, 1]])("normalizes deltaMode %s to viewport pixel navigation", (deltaMode, deltaY) => {
+        const onRequestIndexChange = vi.fn();
+        renderHook(() => useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,
+          threshold:35,debounce:100,onRequestIndexChange,viewport:mockViewport}));
+        mockViewport.dispatchEvent(new WheelEvent("wheel",{deltaMode,deltaY,bubbles:true,cancelable:true}));
+        expect(onRequestIndexChange).toHaveBeenCalledTimes(1);
+        expect(onRequestIndexChange).toHaveBeenCalledWith(1);
+    });
+    it("does not drag on zero primary-axis wheel events", () => {
+        const onRequestIndexChange=vi.fn(),onDragStart=vi.fn();
+        renderHook(() => useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,
+          threshold:35,debounce:100,onRequestIndexChange,onDragStart,viewport:mockViewport}));
+        fireWheelEvent(mockViewport,0,60);
+        expect(onDragStart).not.toHaveBeenCalled();
+        expect(onRequestIndexChange).not.toHaveBeenCalled();
     });
 });
