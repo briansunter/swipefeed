@@ -60,9 +60,9 @@ jobs:
       - name: Merge coverage reports
         run: bun run coverage:merge
 
-      - name: Upload merged coverage
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-merged
-          path: coverage/merged
+      - name: Report merged coverage
+        run: |
+          echo "::group::Merged coverage"
+          find coverage/merged -type f | head -50
+          echo "::endgroup::"
 
