@@ -94,3 +94,18 @@ it('does not activate a control after a sideways drag that never pages',()=>{
  expect(click.defaultPrevented).toBe(true);
  expect(t.change).not.toHaveBeenCalled();
 });
+
+it('cancels an active drag on page hide and does not page on late release', () => {
+ const t=setup();
+ t.event('pointerMove',350,80);
+ act(()=>window.dispatchEvent(new Event('pagehide')));
+ t.event('pointerUp',330);
+ expect(t.change.mock.calls).toEqual([[1]]);
+});
+
+it('suppresses native drag while a gesture owns the control surface', () => {
+ const t=setup({dragFromControls:true});
+ const event=new Event('dragstart',{bubbles:true,cancelable:true});
+ act(()=>t.view.getByRole('button').dispatchEvent(event));
+ expect(event.defaultPrevented).toBe(true);
+});

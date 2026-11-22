@@ -8,8 +8,12 @@ const items = [{ id: "a" }, { id: "b" }, { id: "c" }];
 
 describe("SwipeDeck motion in a real browser", () => {
   it("emits continuous motion from native scrolling and stores the same snapshot", async () => {
-    const onMotionChange = vi.fn<(motion: SwipeDeckMotion) => void>();
     const ref = createRef<SwipeDeckHandle>();
+    const snapshots: SwipeDeckMotion[] = [];
+    const onMotionChange = vi.fn<(motion: SwipeDeckMotion) => void>(() => {
+      const snapshot = ref.current?.getMotion();
+      if (snapshot) snapshots.push(snapshot);
+    });
     render(
       <SwipeDeck
         ref={ref}
@@ -37,7 +41,8 @@ describe("SwipeDeck motion in a real browser", () => {
         isSettled: false,
       }));
     });
-    const motion = ref.current?.getMotion();
+    // Capture in the callback, before the native settle timer can emit the next state.
+    const motion = snapshots.find((snapshot) => Math.abs(snapshot.position - 0.7) < 0.01);
     expect(motion?.position).toBeCloseTo(0.7);
     expect(motion?.index).toBe(1);
     expect(motion?.offset).toBeCloseTo(

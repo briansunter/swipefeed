@@ -10,7 +10,7 @@ function setup(){
  vi.stubGlobal('ResizeObserver',class{observe(){}unobserve(){}disconnect(){}});
  vi.stubGlobal('requestAnimationFrame',(fn:FrameRequestCallback)=>setTimeout(()=>fn(Date.now()),16));vi.stubGlobal('cancelAnimationFrame',(id:number)=>clearTimeout(id));
  const height=vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(600);vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(400);
- Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:function(opts:ScrollToOptions){this.scrollTop=opts.top??0;}});
+ Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:function(opts:ScrollToOptions){if(opts.top!==undefined)this.scrollTop=opts.top;if(opts.left!==undefined)this.scrollLeft=opts.left;}});
  const ref=createRef<SwipeDeckHandle>();const changed=vi.fn();const view=render(<SwipeDeck ref={ref} items={['a','b','c']} index={0} transitionDuration={320} onIndexChange={changed} gesture={{touch:'controlled',threshold:80}}>{({item})=><div>{item}</div>}</SwipeDeck>);
  const viewport=view.getByRole('feed');act(()=>vi.advanceTimersByTime(100));
  function input(type:string,y:number,target:EventTarget=viewport){const e=new PointerEvent(type,{bubbles:true,clientY:y,clientX:100,pointerId:1,pointerType:'touch',button:0});Object.defineProperty(e,'timeStamp',{value:Date.now()});act(()=>target.dispatchEvent(e));}
@@ -62,4 +62,39 @@ it('overlay controls preserve taps and keyboard clicks but do not activate after
 it('open descriptions retain their own scroll gestures',()=>{
  const {view,changed,pointer}=overlaySetup();
  const text=view.getByText('Scrollable caption');pointer('pointerdown',590,text);pointer('pointermove',440,text);pointer('pointerup',400,text);expect(changed).not.toHaveBeenCalled();
+});
+
+it('advances once on a controlled wheel stream despite momentum', () => {
+ const {view,changed}=overlaySetup();
+ const viewport=view.getByRole('feed');
+ const wheel=(deltaY:number)=>act(()=>viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY})));
+ wheel(35);
+ act(()=>vi.advanceTimersByTime(16));
+ wheel(100);
+ wheel(110);
+ expect(changed.mock.calls).toEqual([[1,'user:wheel']]);
+ act(()=>vi.advanceTimersByTime(700));
+ expect(viewport.scrollTop).toBe(600);
+ expect(changed.mock.calls).toEqual([[1,'user:wheel']]);
+});
+
+it('keeps the current card after subthreshold wheel preview settles', () => {
+ const {view,changed}=overlaySetup();
+ const viewport=view.getByRole('feed');
+ act(()=>viewport.dispatchEvent(new WheelEvent('wheel',{bubbles:true,cancelable:true,deltaY:25})));
+ act(()=>vi.advanceTimersByTime(16));
+ expect(viewport.scrollTop).toBeGreaterThan(0);
+ act(()=>vi.advanceTimersByTime(700));
+ expect(viewport.scrollTop).toBe(0);
+ expect(changed.mock.calls).toEqual([[0,'snap']]);
+});
+
+it('retains a pending touch across toolbar resize without moving off the selected page', () => {
+ const {viewport,input,height,changed}=setup();
+ input('pointerdown',500);
+ height.mockReturnValue(700);
+ act(()=>window.dispatchEvent(new Event('resize')));
+ expect(viewport.scrollTop).toBe(0);
+ input('pointerup',500);
+ expect(changed).not.toHaveBeenCalled();
 });

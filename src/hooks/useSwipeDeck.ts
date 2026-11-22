@@ -817,6 +817,10 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
       const oldWidth=previousWidth;
       const oldHeight=previousHeight;
       if(width===oldWidth&&height===oldHeight){
+        // A first/same-size observer notification must not pull a native scroll
+        // back to a stale index before IntersectionObserver can report it.
+        if (latest.current.options.gesture?.touch !== "controlled"
+          && latest.current.options.visibility?.strategy === "intersection") return;
         const size=latest.current.orientation==="vertical"?height:width;
         const offset=latest.current.orientation==="vertical"?viewport.scrollTop:viewport.scrollLeft;
         if(gestures.hasPointer()||isNavigatingRef.current||Math.abs(offset-latest.current.index*size)<1)return;
