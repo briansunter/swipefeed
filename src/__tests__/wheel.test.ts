@@ -38,7 +38,8 @@ it("keeps a wheel gesture listener stable while using the latest parent callback
   const element=document.createElement("div");
   const add=vi.spyOn(element,"addEventListener");
   const remove=vi.spyOn(element,"removeEventListener");
-  const first=vi.fn(), second=vi.fn();
+  const first=vi.fn();
+  const second=vi.fn();
   const {rerender,unmount}=renderHook(({callback})=>useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,threshold:35,debounce:100,viewport:element,onRequestIndexChange:callback,onDragEnd:()=>{}}),{initialProps:{callback:first}});
   element.dispatchEvent(new WheelEvent("wheel",{deltaY:20}));
   rerender({callback:second});
@@ -57,7 +58,10 @@ import { act, cleanup } from '@testing-library/react';
 afterEach(()=>{cleanup();vi.useRealTimers();vi.restoreAllMocks()});
 function sequence(options: Partial<Parameters<typeof useWheel>[0]> = {}) {
  vi.useFakeTimers();vi.spyOn(performance,'now').mockImplementation(()=>Date.now());
- const viewport=document.createElement('div'), change=vi.fn(), drag=vi.fn(), end=vi.fn();
+ const viewport=document.createElement('div');
+ const change=vi.fn();
+ const drag=vi.fn();
+ const end=vi.fn();
  const hook=renderHook(()=>useWheel({orientation:'vertical',direction:'ltr',discretePaging:true,threshold:35,debounce:220,cooldown:0,viewport,onRequestIndexChange:change,onDrag:drag,onDragEnd:end,...options}));
  const wheel=(y:number,ms=16,extra:WheelEventInit={})=>{act(()=>vi.advanceTimersByTime(ms));act(()=>viewport.dispatchEvent(new WheelEvent('wheel',{deltaY:y,bubbles:true,cancelable:true,...extra})));};
  return {wheel,change,drag,end,...hook};

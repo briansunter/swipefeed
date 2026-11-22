@@ -44,10 +44,10 @@ export function useGestures(params: UseGesturesParams) {
   const [isDragging, setIsDragging] = useState(false);
   const state = useRef<{
     pointer: number; start: number; cross: number; delta: number;
-    index: number; started: boolean; rejected: boolean; samples: Sample[];
+    index: number; started: boolean; moved: boolean; samples: Sample[];
   } | null>(null);
-  const coord = (evt: InputPoint, primary: boolean) =>
-    (latest.current.orientation === "vertical") === primary ? evt.clientY : evt.clientX;
+  const coord = useCallback((evt: InputPoint, primary: boolean) =>
+    (latest.current.orientation === "vertical") === primary ? evt.clientY : evt.clientX, []);
 
   const reset = useCallback(() => {
     if (!state.current) return;
@@ -57,11 +57,13 @@ export function useGestures(params: UseGesturesParams) {
   }, []);
 
   const finish = useCallback((cancelled: boolean, now=performance.now()) => {
-    const s = state.current, p = latest.current;
+    const s = state.current;
+    const p = latest.current;
     if (!s) return;
+    if (s.moved) suppressClickUntil.current = performance.now() + 500;
     if (!s.started) { reset(); return; }
-    suppressClickUntil.current = performance.now() + 500;
-    const last=s.samples.at(-1)!;
+    const last=s.samples.at(-1);
+    if (!last) { reset(); return; }
     const cutoff=now-100;
     let first=s.samples[0];
     let following:Sample|undefined;
@@ -78,13 +80,13 @@ export function useGestures(params: UseGesturesParams) {
     const velocity=now-last.time<120&&last.time>first.time
       ?(last.position-first.position)/(last.time-first.time):0;
     const distance = Math.abs(s.delta);
-    const threshold = Math.min(p.maxThreshold??Infinity,
+    const threshold = Math.min(p.maxThreshold??Number.POSITIVE_INFINITY,
       Math.max(p.threshold, (p.viewportSize?.() ?? 0) * (p.distanceRatio ?? 0)));
     const flick = distance >= (p.minFlickDistance ?? 24)
       && Math.abs(velocity) >= p.flickVelocity && Math.sign(velocity) === Math.sign(s.delta);
     const forward = p.orientation === "horizontal" && p.direction === "rtl" ? s.delta > 0 : s.delta < 0;
     let next = s.index;
-    if (!cancelled && !s.rejected && (distance >= threshold || flick)) next += forward ? 1 : -1;
+    if (!cancelled && (distance >= threshold || flick)) next += forward ? 1 : -1;
     next = p.loop ? (next + p.maxIndex + 1) % (p.maxIndex + 1) : clamp(next, 0, p.maxIndex);
     reset();
     p.setAnimating(true);
@@ -106,18 +108,23 @@ export function useGestures(params: UseGesturesParams) {
     if ((evt.target as Element).closest?.(ignored)) return;
     suppressClickUntil.current = 0;
     state.current = {pointer:evt.pointerId,start:coord(evt,true),cross:coord(evt,false),delta:0,
-      index:p.getIndex(),started:false,rejected:false,samples:[{position:coord(evt,true),time:inputTime(evt)}]};
-  }, []);
+      index:p.getIndex(),started:false,moved:false,samples:[{position:coord(evt,true),time:inputTime(evt)}]};
+  }, [coord]);
 
   const updateDrag = useCallback((evt: React.PointerEvent, final=false) => {
-    const s = state.current, p = latest.current;
-    if (!s || evt.pointerId !== s.pointer || s.rejected) return;
+    const s = state.current;
+    const p = latest.current;
+    if (!s || evt.pointerId !== s.pointer) return;
     if(p.enabled===false){finish(true);return;}
-    const position = coord(evt,true), delta = position - s.start;
+    const position = coord(evt,true);
+    const delta = position - s.start;
+    const cross = Math.abs(coord(evt,false)-s.cross);
+    if (Math.hypot(delta,cross) >= 8) s.moved=true;
     if (!s.started) {
-      const cross = Math.abs(coord(evt,false)-s.cross);
-      if (Math.max(Math.abs(delta),cross) < 8) return;
-      if (p.lockAxis && cross > Math.abs(delta)) { s.rejected=true; return; }
+      // Stay pending through sideways thumb drift instead of rejecting the
+      // entire pointer. Once intent is clear, keep this axis until release.
+      // A modest diagonal tolerance avoids requiring a perfectly straight swipe.
+      if (Math.abs(delta) < 8 || (p.lockAxis && Math.abs(delta) < cross * 0.75)) return;
       s.started=true;
       if(!final){try {evt.currentTarget.setPointerCapture?.(evt.pointerId);} catch {}}
       setIsDragging(true);
@@ -125,9 +132,11 @@ export function useGestures(params: UseGesturesParams) {
     }
     s.delta=delta;
     const record=(point:InputPoint,stationary=false)=>{
-      const time=inputTime(point),position=coord(point,true),last=s.samples.at(-1)!;
-      if(time<last.time||(!stationary&&position===last.position))return;
-      if(time===last.time)s.samples[s.samples.length-1]={position,time};
+      const time=inputTime(point);
+      const position=coord(point,true);
+      const last=s.samples.at(-1);
+      if(last && (time<last.time||(!stationary&&position===last.position)))return;
+      if(last && time===last.time)s.samples[s.samples.length-1]={position,time};
       else s.samples.push({position,time});
       while(s.samples.length>2&&s.samples[1].time<time-140)s.samples.shift();
       if(s.samples.length>64)s.samples.splice(1,s.samples.length-64);
@@ -137,7 +146,7 @@ export function useGestures(params: UseGesturesParams) {
     record(evt,!final);
     if (evt.cancelable) evt.preventDefault();
     p.onDrag?.(delta,evt);
-  }, []);
+  }, [coord,finish]);
   const onPointerMove=useCallback((evt:React.PointerEvent)=>updateDrag(evt),[updateDrag]);
   const onPointerUp = useCallback((evt: React.PointerEvent) => {
     if (evt.pointerId !== state.current?.pointer)return;

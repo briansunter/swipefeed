@@ -248,7 +248,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   }, [emitMotion]);
 
   useEffect(() => {
-    if (!viewport) return;
+    if (!viewport || !Number.isFinite(index)) return;
     emitMotion(true, { orientation, itemCount: items.length });
   }, [emitMotion, index, items.length, orientation, viewport]);
 
@@ -453,7 +453,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         const tick = (now: number) => {
           if (completed || lastNavigationIndexRef.current !== next) return;
           const progress = clamp((now - started) / duration, 0, 1);
-          write(from + (target - from) * (1 - Math.pow(1 - progress, 3)));
+          write(from + (target - from) * (1 - (1 - progress) ** 3));
           scheduleMotion();
           if (progress < 1) alignmentRafRef.current = requestAnimationFrame(tick);
           else finish();
@@ -527,7 +527,7 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
         snapRestoreTimeoutRef.current = setTimeout(handleScrollEnd, restoreDelay);
       }
     },
-    []
+    [emitMotion, scheduleMotion]
   );
 
   // Controlled indexes can change through routing, deep links or list updates,
@@ -538,7 +538,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     // Let the finger continue moving the viewport until native snap settles it.
     if (nativeIndexRef.current === index) { nativeIndexRef.current = null; return; }
     if (dragActiveRef.current || (isNavigatingRef.current && lastNavigationIndexRef.current === index)) return;
-    const size = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+    const measuredSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+    const size = measuredSize || virtualizer.containerSize;
     if (size <= 0) return;
     const target = index * size;
     const current = orientation === "vertical" ? viewport.scrollTop : viewport.scrollLeft;
@@ -549,7 +550,8 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
     // Keep snap enabled: toggling it can reselect the previously snapped slide
     // after virtualization removes an earlier item, leaving active media offscreen.
     const align = () => {
-      const offset = latest.current.index * (orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth);
+      const currentSize = orientation === "vertical" ? viewport.clientHeight : viewport.clientWidth;
+      const offset = latest.current.index * (currentSize || size);
       viewport.scrollTo(orientation === "vertical" ? {top: offset, behavior:"instant"} : {left: offset, behavior:"instant"});
     };
     align();
@@ -807,10 +809,13 @@ export function useSwipeDeck<T>(options: SwipeDeckOptions<T>): SwipeDeckAPI<T> {
   useEffect(() => {
     if (!viewport) return;
 
-    let previousWidth=viewport.clientWidth, previousHeight=viewport.clientHeight;
+    let previousWidth=viewport.clientWidth;
+    let previousHeight=viewport.clientHeight;
     const handleResize = () => {
-      const width=viewport.clientWidth,height=viewport.clientHeight;
-      const oldWidth=previousWidth,oldHeight=previousHeight;
+      const width=viewport.clientWidth;
+      const height=viewport.clientHeight;
+      const oldWidth=previousWidth;
+      const oldHeight=previousHeight;
       if(width===oldWidth&&height===oldHeight){
         const size=latest.current.orientation==="vertical"?height:width;
         const offset=latest.current.orientation==="vertical"?viewport.scrollTop:viewport.scrollLeft;

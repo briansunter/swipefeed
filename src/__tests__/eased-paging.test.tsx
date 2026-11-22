@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import {afterEach,it,expect,vi} from 'vitest';
-import React,{createRef} from 'react';
+import {createRef} from 'react';
 import {render,cleanup,act} from '@testing-library/react';
 import {SwipeDeck} from '../components/SwipeDeck';
 import type {SwipeDeckHandle} from '../types';
@@ -17,19 +17,20 @@ it('paints intermediate eased positions and releases its navigation lock',()=>{
  const ref=createRef<SwipeDeckHandle>();
  const view=render(<SwipeDeck ref={ref} items={['a','b','c']} transitionDuration={320}>{({item})=><div>{item}</div>}</SwipeDeck>);
  const viewport=view.getByRole('feed');
- act(()=>ref.current!.scrollTo(1,{behavior:'smooth'}));
+ const getDeck=()=>{const deck=ref.current;if(!deck)throw new Error("SwipeDeck handle missing");return deck;};
+ act(()=>getDeck().scrollTo(1,{behavior:'smooth'}));
  expect(viewport.scrollTop).toBe(0);
  act(()=>vi.advanceTimersByTime(160));
  expect(viewport.scrollTop).toBeGreaterThan(0);expect(viewport.scrollTop).toBeLessThan(600);
- expect(ref.current!.getState().isAnimating).toBe(true);
+ expect(getDeck().getState().isAnimating).toBe(true);
  act(()=>vi.advanceTimersByTime(400));
- expect(viewport.scrollTop).toBe(600);expect(ref.current!.getState().isAnimating).toBe(false);
+ expect(viewport.scrollTop).toBe(600);expect(getDeck().getState().isAnimating).toBe(false);
  expect(viewport.style.scrollSnapType).toBe('y mandatory');
- act(()=>ref.current!.scrollTo(2,{behavior:'smooth'}));act(()=>vi.advanceTimersByTime(80));
+ act(()=>getDeck().scrollTo(2,{behavior:'smooth'}));act(()=>vi.advanceTimersByTime(80));
  height.mockReturnValue(300);act(()=>window.dispatchEvent(new Event('resize')));
  expect(viewport.scrollTop).toBe(600);
  act(()=>vi.advanceTimersByTime(600));expect(viewport.scrollTop).toBe(600);
- expect(ref.current!.getState().isAnimating).toBe(false);
+ expect(getDeck().getState().isAnimating).toBe(false);
 });
 
 it('flushes the final finger position before starting its release animation',()=>{

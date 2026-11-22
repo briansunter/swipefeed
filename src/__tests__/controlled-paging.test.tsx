@@ -34,7 +34,8 @@ it('retains native snap anchors while bounding media to the virtual range',()=>{
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:function(opts:ScrollToOptions){this.scrollTop=opts.top||0;}});
  const items=Array.from({length:100},(_,i)=>String(i));
  const ui=(index:number)=><SwipeDeck items={items} index={index} virtual={{overscan:1,retainSnapAnchors:true}}>{({item})=><span data-art>{item}</span>}</SwipeDeck>;
- const view=render(ui(0)),viewport=view.getByRole('feed');
+ const view=render(ui(0));
+ const viewport=view.getByRole('feed');
  const first=viewport.querySelector('article[data-index="0"]');
  expect(viewport.querySelectorAll(':scope > div > article')).toHaveLength(100);
  expect(viewport.querySelectorAll('[data-art]').length).toBeLessThan(10);
@@ -51,9 +52,11 @@ it('does not jump to a boundary when a parent acknowledges a native finger scrol
  vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(600);
  vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(400);
  Object.defineProperty(HTMLElement.prototype,'scrollTo',{configurable:true,value:function(opts:ScrollToOptions){this.scrollTop=opts.top||0;}});
- const changed=vi.fn(),items=['a','b','c'];
+ const changed=vi.fn();
+ const items=['a','b','c'];
  const ui=(index:number)=><SwipeDeck items={items} index={index} onIndexChange={changed}>{({item})=><div>{item}</div>}</SwipeDeck>;
- const view=render(ui(0)),viewport=view.getByRole('feed');
+ const view=render(ui(0));
+ const viewport=view.getByRole('feed');
  act(()=>viewport.dispatchEvent(new Event('touchstart',{bubbles:true})));
  expect(viewport.style.scrollSnapType).toBe('none');
  viewport.scrollTop=350;act(()=>viewport.dispatchEvent(new Event('scroll')));

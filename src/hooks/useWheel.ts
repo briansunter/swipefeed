@@ -25,7 +25,7 @@ export type UseWheelParams = {
 export function useWheel(params: UseWheelParams) {
   const latest = useRef(params);
   latest.current = params;
-  const state = useRef({ last: -Infinity, committedAt: -Infinity, consumed: false,
+  const state = useRef({ last: Number.NEGATIVE_INFINITY, committedAt: Number.NEGATIVE_INFINITY, consumed: false,
     tracking: false, rejected: false, total: 0, visual: 0 });
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const endPreview = useCallback(() => {
@@ -45,13 +45,15 @@ export function useWheel(params: UseWheelParams) {
     const element = params.viewport;
     if (!element) return;
     const onWheel = (event: WheelEvent) => {
-      const p = latest.current, s = state.current;
+      const p = latest.current;
+      const s = state.current;
       if (!p.discretePaging || p.enabled === false || event.ctrlKey || event.metaKey) return;
       if ((event.target as Element).closest?.('input,textarea,select,[contenteditable=true],[data-swipe-ignore],details[open]')) return;
       const primary = p.orientation === 'vertical' ? event.deltaY : event.deltaX;
       const cross = p.orientation === 'vertical' ? event.deltaX : event.deltaY;
       if (!Number.isFinite(primary) || !Number.isFinite(cross) || (!primary && !cross)) return;
-      const now = performance.now(), quiet = Math.max(1, p.debounce);
+      const now = performance.now();
+      const quiet = Math.max(1, p.debounce);
       if (now - s.last >= quiet) {
         endPreview();
         s.consumed = false;

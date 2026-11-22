@@ -4,13 +4,16 @@ import {act,cleanup,fireEvent,render} from '@testing-library/react';
 import {useGestures} from '../hooks/useGestures';
 afterEach(()=>{cleanup();vi.restoreAllMocks();});
 function setup(config:Partial<Parameters<typeof useGestures>[0]>={}){
- let now=1000,inputTime=1000;vi.spyOn(performance,'now').mockImplementation(()=>now);
- const change=vi.fn(),drag=vi.fn();
+ let now=1000;
+ let inputTime=1000;vi.spyOn(performance,'now').mockImplementation(()=>now);
+ const change=vi.fn();
+ const drag=vi.fn();
  function Test(){const {handlers}=useGestures({orientation:'vertical',direction:'ltr',threshold:80,
   distanceRatio:.22,viewportSize:()=>844,minFlickDistance:55,flickVelocity:.65,controlledTouch:true,
   lockAxis:true,ignoreWhileAnimating:false,loop:false,getIndex:()=>1,maxIndex:10,onRequestIndexChange:change,
-  setAnimating:()=>{},isAnimating:false,onDrag:drag,...config});return <div data-testid="surface" {...handlers}><button>Control</button></div>;}
- const view=render(<Test/>),surface=view.getByTestId('surface');
+  setAnimating:()=>{},isAnimating:false,onDrag:drag,...config});return <div data-testid="surface" {...handlers}><button type="button">Control</button></div>;}
+ const view=render(<Test/>);
+ const surface=view.getByTestId('surface');
  const event=(type:'pointerDown'|'pointerMove'|'pointerUp'|'pointerCancel',y:number,ms=16,id=1,x=100,lag=0)=>{
   inputTime+=ms;now=inputTime+lag;
   const evt=new PointerEvent(type.toLowerCase(),{clientX:x,clientY:y,pointerId:id,pointerType:'touch',button:0,bubbles:true});
@@ -46,5 +49,48 @@ it('caps the phone-sized distance threshold so a slow thumb swipe can commit',()
 it('still returns a tiny phone flick to the same item',()=>{const t=setup({threshold:64,distanceRatio:.16,maxThreshold:120,minFlickDistance:40,flickVelocity:.45});t.event('pointerMove',576,8);t.event('pointerUp',576,8);expect(t.change.mock.calls).toEqual([[1]]);});
 
 it('disabling gestures ignores a new pointer',()=>{const t=setup({enabled:false});t.event('pointerMove',300,30);t.event('pointerUp',300,20);expect(t.change).not.toHaveBeenCalled();expect(t.drag).not.toHaveBeenCalled();});
-it('handing a stationary hold to content never uses its release as a swipe',()=>{const config={enabled:true},t=setup(config);config.enabled=false;t.rerender();t.event('pointerUp',350,20);expect(t.change).not.toHaveBeenCalled();});
-it('disabling an active drag cancels at the anchor exactly once',()=>{const config={enabled:true},t=setup(config);t.event('pointerMove',550,30);config.enabled=false;t.rerender();t.event('pointerUp',350,20);expect(t.change.mock.calls).toEqual([[1]]);});
+it('handing a stationary hold to content never uses its release as a swipe',()=>{const config={enabled:true};
+const t=setup(config);config.enabled=false;t.rerender();t.event('pointerUp',350,20);expect(t.change).not.toHaveBeenCalled();});
+it('disabling an active drag cancels at the anchor exactly once',()=>{const config={enabled:true};
+const t=setup(config);t.event('pointerMove',550,30);config.enabled=false;t.rerender();t.event('pointerUp',350,20);expect(t.change.mock.calls).toEqual([[1]]);});
+
+it('waits through sideways thumb drift before recognizing a vertical swipe',()=>{
+ const t=setup();
+ t.event('pointerMove',596,30,1,114);
+ expect(t.drag).not.toHaveBeenCalled();
+ t.event('pointerMove',570,30,1,118);
+ t.event('pointerMove',350,150,1,130);
+ expect(t.change).not.toHaveBeenCalled();
+ t.event('pointerUp',350,20,1,130);
+ expect(t.change.mock.calls).toEqual([[2]]);
+});
+it('accepts diagonal intent without requiring a perfectly vertical start',()=>{
+ const t=setup();
+ t.event('pointerMove',580,30,1,124);
+ expect(t.drag).toHaveBeenCalled();
+ t.event('pointerMove',350,150,1,170);
+ t.event('pointerUp',350,20,1,170);
+ expect(t.change.mock.calls).toEqual([[2]]);
+});
+it('can resolve pending sideways drift from the final release coordinate',()=>{
+ const t=setup();
+ t.event('pointerMove',598,30,1,112);
+ t.event('pointerUp',350,200,1,130);
+ expect(t.change.mock.calls).toEqual([[2]]);
+});
+it('does not page for a mostly perpendicular diagonal gesture',()=>{
+ const t=setup();
+ t.event('pointerMove',580,30,1,200);
+ t.event('pointerUp',575,20,1,220);
+ expect(t.drag).not.toHaveBeenCalled();
+ expect(t.change).not.toHaveBeenCalled();
+});
+it('does not activate a control after a sideways drag that never pages',()=>{
+ const t=setup({dragFromControls:true});
+ t.event('pointerMove',598,30,1,120);
+ t.event('pointerUp',598,20,1,120);
+ const click=new MouseEvent('click',{bubbles:true,cancelable:true,detail:1});
+ act(()=>t.view.getByText('Control').dispatchEvent(click));
+ expect(click.defaultPrevented).toBe(true);
+ expect(t.change).not.toHaveBeenCalled();
+});

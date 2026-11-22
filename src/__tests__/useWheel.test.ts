@@ -368,7 +368,8 @@ describe("useWheel", () => {
         expect(onRequestIndexChange).toHaveBeenCalledWith(1);
     });
     it("does not drag on zero primary-axis wheel events", () => {
-        const onRequestIndexChange=vi.fn(),onDragStart=vi.fn();
+        const onRequestIndexChange=vi.fn();
+        const onDragStart=vi.fn();
         renderHook(() => useWheel({orientation:"vertical",direction:"ltr",discretePaging:true,
           threshold:35,debounce:100,onRequestIndexChange,onDragStart,viewport:mockViewport}));
         fireWheelEvent(mockViewport,0,60);
