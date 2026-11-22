@@ -2,7 +2,17 @@ import "@testing-library/jest-dom";
 
 // Polyfill PointerEvent for jsdom environments
 if (typeof PointerEvent === "undefined") {
-  class PointerEventPolyfill extends MouseEvent { }
+  class PointerEventPolyfill extends MouseEvent {
+    pointerId: number;
+    pointerType: string;
+    isPrimary: boolean;
+    constructor(type: string, init: PointerEventInit = {}) {
+      super(type, init);
+      this.pointerId = init.pointerId ?? 0;
+      this.pointerType = init.pointerType ?? "mouse";
+      this.isPrimary = init.isPrimary ?? true;
+    }
+  }
   // @ts-expect-error override global
   globalThis.PointerEvent = PointerEventPolyfill;
 }

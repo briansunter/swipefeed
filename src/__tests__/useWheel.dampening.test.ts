@@ -91,22 +91,12 @@ describe("useWheel advanced logic", () => {
         expect(onRequestIndexChange).toHaveBeenCalledTimes(1);
     });
 
-    it("locks direction during gesture", () => {
+    it("reversing before commit unwinds the preview before navigating", () => {
         const { onRequestIndexChange, element } = setupHook({ threshold: 50 });
-
-        // Scroll down (positive)
-        element.dispatchEvent(new WheelEvent("wheel", { deltaY: 20 })); // Accum: 20
-
-        // Scroll up (negative) - should reset and lock to up? 
-        // Logic: if gestureDirection !== current -> reset.
-        element.dispatchEvent(new WheelEvent("wheel", { deltaY: -20 })); // Reset accum to 0, then start accum -20.
-
-        // If it didn't reset (just summed): 20 - 20 = 0.
-        // If it reset: -20.
-
-        element.dispatchEvent(new WheelEvent("wheel", { deltaY: -20 })); // -40
-        element.dispatchEvent(new WheelEvent("wheel", { deltaY: -20 })); // -60 -> Trigger
-
+        element.dispatchEvent(new WheelEvent("wheel", { deltaY: 20 }));
+        for (let i = 0; i < 3; i++) element.dispatchEvent(new WheelEvent("wheel", { deltaY: -20 }));
+        expect(onRequestIndexChange).not.toHaveBeenCalled();
+        element.dispatchEvent(new WheelEvent("wheel", { deltaY: -20 }));
         expect(onRequestIndexChange).toHaveBeenCalledWith(-1);
     });
 });
